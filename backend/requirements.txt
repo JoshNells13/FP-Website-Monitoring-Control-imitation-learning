@@ -1,0 +1,13 @@
+flask>=3.1.0
+flask-cors>=6.0.0
+flask-socketio>=5.5.0
+pandas>=2.2.0
+numpy>=2.0.0
+matplotlib>=3.9.0
+psutil>=7.0.0
+simple-websocket>=1.1.0
+tensorboard>=2.18.0
+imageio>=2.35.0
+imageio-ffmpeg>=0.5.1
+opencv-python>=4.10.0
+PyYAML>=6.0.0

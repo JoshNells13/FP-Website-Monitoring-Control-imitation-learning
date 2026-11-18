@@ -1,0 +1,86 @@
+# ==============================================================================
+# .gitignore — Humanoid Imitation Learning Control & Visualization Platform
+# Protects private datasets, model weights, credentials, and build artifacts
+# ==============================================================================
+
+# 1. Environment Variables, Secrets & Credentials (NEVER SHARE PUBLICLY)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*secret*
+*credential*
+config.local.*
+
+# 2. Python Virtual Environments, Bytecode & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+.Python
+.venv/
+venv/
+env/
+ENV/
+.python/
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# 3. Ephemeral Runtime & Local Instance / Database Files
+instance/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+tmp/
+temp/
+
+# 4. Node.js / Next.js Frontend Dependencies & Build Artifacts
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+.vercel/
+next-env.d.ts
+frontend/next-env.d.ts
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# 5. Private / Heavy Simulation Data, Checkpoints, TensorBoard Logs & Videos
+*.pt
+*.pth
+*.onnx
+*.ckpt
+*.npz
+*.pkl
+*.bvh
+*.mp4
+*.avi
+*.mov
+events.out.tfevents.*
+wandb/
+
+# 6. OS & IDE Metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-canvas: #f3f4f6;
+    --bg-card: #ffffff;
+    --border-card: #eaecf0;
+    --text-main: #111827;
+    --text-muted: #6b7280;
+    --accent-lime: #84cc16;
+    --accent-orange: #fb923c;
+  }
+
+  .dark {
+    --bg-canvas: #0b0f17;
+    --bg-card: #111827;
+    --border-card: #1f2937;
+    --text-main: #f9fafb;
+    --text-muted: #9ca3af;
+  }
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-main);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Bento card utility */
+.bento-card {
+  @apply bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-[22px] shadow-[0_2px_14px_rgba(15,23,42,0.035)];
+}
+
+/* Diagonal hatch pattern for ACRU-style progress bars & bar charts */
+.hatch-lime {
+  background-color: #84cc16;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.22) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+.hatch-orange {
+  background-color: #fb923c;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.22) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, 0.5);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(132, 204, 22, 0.8);
+}
