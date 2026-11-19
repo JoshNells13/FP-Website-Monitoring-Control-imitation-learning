@@ -27,8 +27,8 @@ export default function TrainingCenterTab({
 }: TrainingCenterTabProps) {
   const [options, setOptions] = useState<any>(null);
   const [form, setForm] = useState({
-    name: "BeyondMimic K1 Kick — Live Finetune Session",
-    description: "Continuing whole-body motion tracking PPO with adaptive failure-bin sampling",
+    name: "BeyondMimic K1 Kick — Live Session",
+    description: "",
     robot: "booster_k1",
     environment: "Mjlab-Tracking-Flat-Booster-K1",
     motion_file: "data/motions/k1_kick.npz",
@@ -87,7 +87,7 @@ export default function TrainingCenterTab({
 
   return (
     <div className="space-y-5">
-      {/* Live Hardware Resource Telemetry Bar (Bento Style) */}
+      {/* Live Hardware Resource Telemetry Bar (100% Real psutil + nvidia-smi values) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bento-card p-4">
           <div className="flex justify-between text-xs text-zinc-500 font-medium">
@@ -98,7 +98,9 @@ export default function TrainingCenterTab({
             <div className="bg-[#84cc16] h-full transition-all" style={{ width: `${cpuPct}%` }} />
           </div>
           <div className="mt-1.5 text-[11px] font-mono text-zinc-400">
-            {resources?.cpu?.cores_physical ?? 8} Physical / {resources?.cpu?.cores_logical ?? 16} Logical Cores
+            {resources?.cpu
+              ? `${resources.cpu.cores_physical} Physical / ${resources.cpu.cores_logical} Logical Cores`
+              : "—"}
           </div>
         </div>
 
@@ -106,7 +108,9 @@ export default function TrainingCenterTab({
           <div className="flex justify-between text-xs text-zinc-500 font-medium">
             <span>System RAM</span>
             <span className="text-zinc-900 dark:text-white font-mono font-bold">
-              {resources?.ram?.used_gb ?? 0} / {resources?.ram?.total_gb ?? 16} GB ({ramPct}%)
+              {resources?.ram
+                ? `${resources.ram.used_gb} / ${resources.ram.total_gb} GB (${ramPct}%)`
+                : "—"}
             </span>
           </div>
           <div className="mt-2.5 w-full bg-zinc-100 dark:bg-zinc-800 h-2.5 rounded-full overflow-hidden">
@@ -124,7 +128,7 @@ export default function TrainingCenterTab({
             <div className="bg-[#fb923c] h-full transition-all" style={{ width: `${gpuPct}%` }} />
           </div>
           <div className="mt-1.5 text-[11px] font-mono text-zinc-400 truncate">
-            {resources?.gpu?.name || "NVIDIA GeForce RTX 5070 Laptop GPU"}
+            {resources?.gpu?.name || "—"}
           </div>
         </div>
 
@@ -132,7 +136,9 @@ export default function TrainingCenterTab({
           <div className="flex justify-between text-xs text-zinc-500 font-medium">
             <span>GPU VRAM</span>
             <span className="text-zinc-900 dark:text-white font-mono font-bold">
-              {resources?.gpu?.vram_used_gb ?? 0} / {resources?.gpu?.vram_total_gb ?? 8} GB ({vramPct}%)
+              {resources?.gpu
+                ? `${resources.gpu.vram_used_gb} / ${resources.gpu.vram_total_gb} GB (${vramPct}%)`
+                : "—"}
             </span>
           </div>
           <div className="mt-2.5 w-full bg-zinc-100 dark:bg-zinc-800 h-2.5 rounded-full overflow-hidden">
@@ -159,7 +165,6 @@ export default function TrainingCenterTab({
         </div>
       )}
 
-      {/* Main Split: Training Configuration Form (Left) & Real-time Process Monitor + Terminal (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-5 bento-card p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
@@ -204,7 +209,13 @@ export default function TrainingCenterTab({
                   onChange={(e) => setForm({ ...form, robot: e.target.value })}
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-white font-mono"
                 >
-                  <option value="booster_k1">booster_k1 (22-DoF)</option>
+                  {(options?.robots || [{ id: "booster_k1", name: "booster_k1 (22-DoF)" }]).map(
+                    (r: any) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
               <div>
@@ -214,9 +225,13 @@ export default function TrainingCenterTab({
                   onChange={(e) => setForm({ ...form, environment: e.target.value })}
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-white font-mono"
                 >
-                  <option value="Mjlab-Tracking-Flat-Booster-K1">
-                    Mjlab-Tracking-Flat-Booster-K1
-                  </option>
+                  {(options?.environments || [{ id: "Mjlab-Tracking-Flat-Booster-K1" }]).map(
+                    (env: any) => (
+                      <option key={env.id} value={env.id}>
+                        {env.id}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
             </div>
@@ -228,13 +243,11 @@ export default function TrainingCenterTab({
                 onChange={(e) => setForm({ ...form, motion_file: e.target.value })}
                 className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-white font-mono"
               >
-                {(options?.motions || [{ path: "data/motions/k1_kick.npz", name: "k1_kick.npz" }]).map(
-                  (m: any) => (
-                    <option key={m.path} value={m.path}>
-                      {m.path} ({m.size_kb || 201} KB)
-                    </option>
-                  )
-                )}
+                {(options?.motions || []).map((m: any) => (
+                  <option key={m.path} value={m.path}>
+                    {m.path} ({m.size_kb} KB)
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -383,7 +396,7 @@ export default function TrainingCenterTab({
           </div>
         </div>
 
-        {/* Right Column: Live Training Progress & Terminal Log Console */}
+        {/* Right Column: Live Process Telemetry (Zero dummy fallbacks) */}
         <div className="lg:col-span-7 flex flex-col gap-5">
           <div className="bento-card p-6">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -392,8 +405,8 @@ export default function TrainingCenterTab({
                   Real-Time Training Execution Telemetry
                 </h3>
                 <p className="text-xs text-zinc-400 font-mono">
-                  PID: {trainingState?.pid || "None"} | Active Log Dir:{" "}
-                  {trainingState?.log_dir || "logs/rsl_rl/k1_tracking (Idle)"}
+                  PID: {trainingState?.pid ?? "None"} | Active Log Dir:{" "}
+                  {trainingState?.log_dir ?? "None (Process Idle)"}
                 </p>
               </div>
               <div className="text-right font-mono">
@@ -421,7 +434,7 @@ export default function TrainingCenterTab({
                 <span className="text-base font-extrabold text-zinc-900 dark:text-white">
                   {trainingState?.latest_metrics?.mean_reward !== undefined
                     ? Number(trainingState.latest_metrics.mean_reward).toFixed(3)
-                    : "+16.413"}
+                    : "—"}
                 </span>
               </div>
               <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700">
@@ -429,7 +442,7 @@ export default function TrainingCenterTab({
                 <span className="text-base font-extrabold text-lime-600 dark:text-lime-400">
                   {trainingState?.latest_metrics?.mean_episode_length !== undefined
                     ? Number(trainingState.latest_metrics.mean_episode_length).toFixed(1)
-                    : "300.5 steps"}
+                    : "—"}
                 </span>
               </div>
               <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700">
@@ -437,13 +450,15 @@ export default function TrainingCenterTab({
                 <span className="text-base font-extrabold text-orange-500">
                   {trainingState?.latest_metrics?.error_body_pos !== undefined
                     ? `${Number(trainingState.latest_metrics.error_body_pos).toFixed(3)} m`
-                    : "0.128 m"}
+                    : "—"}
                 </span>
               </div>
               <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700">
-                <span className="text-zinc-400 block text-[10px]">ACTOR / CRITIC</span>
-                <span className="text-sm font-extrabold text-zinc-900 dark:text-white">
-                  [512, 256, 128]
+                <span className="text-zinc-400 block text-[10px]">JOINT POS ERROR</span>
+                <span className="text-base font-extrabold text-zinc-900 dark:text-white">
+                  {trainingState?.latest_metrics?.error_joint_pos !== undefined
+                    ? `${Number(trainingState.latest_metrics.error_joint_pos).toFixed(3)} rad`
+                    : "—"}
                 </span>
               </div>
             </div>
@@ -453,7 +468,7 @@ export default function TrainingCenterTab({
             <div className="bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between text-xs font-mono">
               <div className="flex items-center gap-2 text-zinc-200">
                 <Terminal className="w-4 h-4 text-lime-400" />
-                <span>MJLab Process stdout / stderr Stream (Live Ephemeral Console)</span>
+                <span>MJLab Process stdout / stderr Stream</span>
               </div>
               <span className="text-[11px] text-zinc-400">{logs.length} log entries</span>
             </div>
@@ -462,10 +477,8 @@ export default function TrainingCenterTab({
               className="flex-1 p-4 font-mono text-xs overflow-y-auto space-y-1 max-h-[390px]"
             >
               {logs.length === 0 ? (
-                <div className="text-zinc-400 space-y-1.5">
-                  <div>[SYSTEM] Stateless process manager ready. Python: human-imitation-learning/.venv/Scripts/python.exe</div>
-                  <div>[SYSTEM] Task: Mjlab-Tracking-Flat-Booster-K1 (22-DoF, 14 keybodies, Trunk anchor)</div>
-                  <div>[SYSTEM] Click &quot;Start PPO&quot; or &quot;Evaluate Policy&quot; to stream real-time MJLab stdout here.</div>
+                <div className="text-zinc-500">
+                  Tidak ada proses training yang sedang berjalan. Klik &quot;Start PPO&quot; atau &quot;Evaluate Policy&quot; untuk menjalankan subprocess MJLab.
                 </div>
               ) : (
                 logs.map((entry, i) => (
@@ -476,7 +489,7 @@ export default function TrainingCenterTab({
                     }`}
                   >
                     <span className="text-zinc-500 mr-2">
-                      [{entry.timestamp?.slice(11, 19) || "00:00:00"}]
+                      [{entry.timestamp?.slice(11, 19) || ""}]
                     </span>
                     {entry.line}
                   </div>

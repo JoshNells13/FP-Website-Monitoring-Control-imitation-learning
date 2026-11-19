@@ -24,25 +24,10 @@ def _parse_run_timestamp(folder_name: str) -> datetime:
 
 
 def sync_filesystem_to_db() -> None:
-    """Populate the stateless in-memory runtime_store directly from live MJLab files (zero database)."""
+    """Populate the stateless in-memory runtime_store strictly from real MJLab files (zero fabricated metrics)."""
     with runtime_store.lock:
         eval_metrics = get_primary_evaluation_metrics()
         run_dirs = sorted([d for d in LOGS_DIR.iterdir() if d.is_dir()]) if LOGS_DIR.exists() else []
-
-        stage_descriptions = {
-            0: "Stage 1 Base Training (Iterations 0–499): Initial PPO policy learning on Booster K1 22-DoF Martial-Arts Front Kick (k1_kick.npz) with 2,048 parallel MuJoCo-Warp environments.",
-            1: "Stage 2 Curriculum Finetune #1 (Iterations 499–998): Resumed from model_499.pt with adaptive failure-bin curriculum sampling and Reference State Initialization (RSI).",
-            2: "Stage 3 Curriculum Finetune #2 (Iterations 998–1497): Resumed from model_998.pt; single-leg balance stabilization during dynamic right-leg kick apex.",
-            3: "Stage 4 Curriculum Finetune #3 (Iterations 1497–1996): Peak reward convergence (+19.70 mean return, 355.8 steps episode survival) with low keybody tracking error.",
-            4: "Stage 5 Curriculum Finetune #4 (Iterations 1996–2495): Extended robustness training up to iteration 2,495; exported to outputs/checkpoints/k1_kick_policy.pt & .onnx.",
-        }
-        pretty_names = [
-            "BeyondMimic K1 Kick — Base PPO (Iter 0–499)",
-            "BeyondMimic K1 Kick — Finetune Stage 2 (Iter 499–998)",
-            "BeyondMimic K1 Kick — Finetune Stage 3 (Iter 998–1497)",
-            "BeyondMimic K1 Kick — Finetune Stage 4 (Iter 1497–1996)",
-            "BeyondMimic K1 Kick — Final Policy Stage 5 (Iter 1996–2495)",
-        ]
 
         exp_by_run_id = {e.run_id: e for e in runtime_store.experiments.values()}
         ckpt_by_path = {c.file_path: c for c in runtime_store.checkpoints.values()}
@@ -68,48 +53,15 @@ def sync_filesystem_to_db() -> None:
             a_rot_info = summary.get("Metrics/motion/error_anchor_rot", {})
             fps_info = summary.get("Perf/total_fps", {})
 
-            start_step = int(rew_info.get("initial_step", idx * 500))
-            final_step = int(rew_info.get("final_step", (idx + 1) * 500 - 1))
-            mean_rew = float(rew_info.get("final_value", 0.0))
-            best_rew = float(rew_info.get("max_value", mean_rew))
-            mean_ep_len = float(ep_len_info.get("final_value", 0.0))
+            start_step = int(rew_info.get("initial_step", 0))
+            final_step = int(rew_info.get("final_step", 0))
+            mean_rew = float(rew_info["final_value"]) if "final_value" in rew_info else None
+            best_rew = float(rew_info["max_value"]) if "max_value" in rew_info else mean_rew
+            mean_ep_len = float(ep_len_info["final_value"]) if "final_value" in ep_len_info else None
 
-            to_val = float(summary.get("Episode_Termination/time_out", {}).get("final_value", 0.0))
-            ap_val = float(summary.get("Episode_Termination/anchor_pos", {}).get("final_value", 0.0))
-            ao_val = float(summary.get("Episode_Termination/anchor_ori", {}).get("final_value", 0.0))
-            ee_val = float(summary.get("Episode_Termination/ee_body_pos", {}).get("final_value", 0.0))
-            tot_term = to_val + ap_val + ao_val + ee_val
-
+            # Only attach k1_metrics.json evaluation metrics to the final evaluated run;
+            # for intermediate runs, use the exact TensorBoard Metrics/motion/* scalars without fabrication.
             is_latest_run = idx == len(run_dirs) - 1
-            if is_latest_run and eval_metrics:
-                mae_rad = float(eval_metrics.get("joint_tracking_mae_rad", 0.14701))
-                rmse_rad = float(eval_metrics.get("joint_tracking_rmse_rad", 0.21691))
-                rmpkpe_mm = float(eval_metrics.get("r_mpkpe_mm", 39.38))
-                mpkpe_mm = float(eval_metrics.get("mpkpe_mm", 108.34))
-                succ_rate = float(eval_metrics.get("success_rate_percent", 65.62))
-                fail_rate = round(100.0 - succ_rate, 2)
-                anchor_ori_rad = float(eval_metrics.get("anchor_orientation_error_rad", 0.1692))
-                jvel_rmse = float(eval_metrics.get("joint_velocity_rmse_rad_s", 1.0181))
-                hand_mm = float(eval_metrics.get("end_effector_hand_error_mm", 33.22))
-                foot_mm = float(eval_metrics.get("end_effector_foot_error_mm", 96.32))
-                completion_pct = succ_rate
-            else:
-                raw_j_err = float(j_err_info.get("final_value", 1.2))
-                mae_rad = round(raw_j_err / 8.2, 5)
-                rmse_rad = round(mae_rad * 1.45, 5)
-                raw_b_err = float(b_err_info.get("final_value", 0.15))
-                rmpkpe_mm = round(raw_b_err * 305.0, 2)
-                mpkpe_mm = round(float(a_pos_info.get("final_value", 0.25)) * 360.0, 2)
-                anchor_ori_rad = round(float(a_rot_info.get("final_value", 0.35)) * 0.44, 5)
-                jvel_rmse = round(float(j_vel_info.get("final_value", 6.5)) / 6.16, 4)
-                hand_mm = round(rmpkpe_mm * 0.85, 2)
-                foot_mm = round(rmpkpe_mm * 2.4, 2)
-                if tot_term > 0:
-                    succ_rate = round(min(95.0, max(12.0, 100.0 * (to_val / tot_term) + (mean_ep_len / 12.0))), 2)
-                else:
-                    succ_rate = round(min(90.0, (mean_ep_len / 300.0) * 65.0), 2)
-                fail_rate = round(100.0 - succ_rate, 2)
-                completion_pct = round(min(100.0, (mean_ep_len / 149.0) * 48.0), 2)
 
             ckpts_in_dir = sorted(
                 rdir.glob("model_*.pt"),
@@ -122,14 +74,14 @@ def sync_filesystem_to_db() -> None:
             )
 
             exp = exp_by_run_id.get(run_id)
-            exp_name = pretty_names[idx] if idx < len(pretty_names) else f"Booster K1 Run ({run_id})"
+            run_name_str = str(agent_cfg.get("run_name", rdir.name))
             if not exp:
                 exp = Experiment(
                     id=runtime_store.next_exp_id(),
                     run_id=run_id,
-                    name=exp_name,
-                    run_name=str(agent_cfg.get("run_name", "beyondmimic_k1_kick")),
-                    description=stage_descriptions.get(idx, f"MJLab BeyondMimic PPO session in {run_id}."),
+                    name=f"{run_name_str} ({start_step}–{final_step})",
+                    run_name=run_name_str,
+                    description=f"Log dir: logs/rsl_rl/k1_tracking/{run_id}",
                     robot_model="booster_k1",
                     task_id="Mjlab-Tracking-Flat-Booster-K1",
                     motion_file="data/motions/k1_kick.npz",
@@ -147,39 +99,55 @@ def sync_filesystem_to_db() -> None:
             exp.start_step = start_step
             exp.current_step = final_step
             exp.final_step = final_step
-            exp.mean_reward = round(mean_rew, 4)
-            exp.best_reward = round(best_rew, 4)
-            exp.mean_episode_length = round(mean_ep_len, 2)
-            exp.value_loss = round(float(vloss_info.get("final_value", 0.0)), 5)
-            exp.surrogate_loss = round(float(sloss_info.get("final_value", 0.0)), 5)
-            exp.learning_rate = float(lr_info.get("final_value", 1e-3))
-            exp.tracking_error_mae = mae_rad
-            exp.tracking_error_rmse = rmse_rad
-            exp.r_mpkpe_mm = rmpkpe_mm
-            exp.mpkpe_mm = mpkpe_mm
-            exp.anchor_pos_error_m = round(float(a_pos_info.get("final_value", 0.0)), 5)
-            exp.anchor_ori_error_rad = anchor_ori_rad
-            exp.joint_vel_error_rmse = jvel_rmse
-            exp.hand_ee_error_mm = hand_mm
-            exp.foot_ee_error_mm = foot_mm
-            exp.motion_completion_pct = completion_pct
-            exp.success_rate = succ_rate
-            exp.failure_rate = fail_rate
+            exp.mean_reward = round(mean_rew, 4) if mean_rew is not None else None
+            exp.best_reward = round(best_rew, 4) if best_rew is not None else None
+            exp.mean_episode_length = round(mean_ep_len, 2) if mean_ep_len is not None else None
+            exp.value_loss = round(float(vloss_info["final_value"]), 5) if "final_value" in vloss_info else None
+            exp.surrogate_loss = round(float(sloss_info["final_value"]), 5) if "final_value" in sloss_info else None
+            exp.learning_rate = float(lr_info["final_value"]) if "final_value" in lr_info else None
+
+            # Real TensorBoard training errors
+            tb_body_pos_err = float(b_err_info["final_value"]) if "final_value" in b_err_info else None
+            tb_joint_pos_err = float(j_err_info["final_value"]) if "final_value" in j_err_info else None
+            tb_joint_vel_err = float(j_vel_info["final_value"]) if "final_value" in j_vel_info else None
+            tb_anchor_pos_err = float(a_pos_info["final_value"]) if "final_value" in a_pos_info else None
+            tb_anchor_rot_err = float(a_rot_info["final_value"]) if "final_value" in a_rot_info else None
+
+            if is_latest_run and eval_metrics:
+                exp.tracking_error_mae = float(eval_metrics["joint_tracking_mae_rad"])
+                exp.tracking_error_rmse = float(eval_metrics["joint_tracking_rmse_rad"])
+                exp.r_mpkpe_mm = float(eval_metrics["r_mpkpe_mm"])
+                exp.mpkpe_mm = float(eval_metrics["mpkpe_mm"])
+                exp.anchor_pos_error_m = round(tb_anchor_pos_err, 5) if tb_anchor_pos_err is not None else None
+                exp.anchor_ori_error_rad = float(eval_metrics["anchor_orientation_error_rad"])
+                exp.joint_vel_error_rmse = float(eval_metrics["joint_velocity_rmse_rad_s"])
+                exp.hand_ee_error_mm = float(eval_metrics["end_effector_hand_error_mm"])
+                exp.foot_ee_error_mm = float(eval_metrics["end_effector_foot_error_mm"])
+                exp.motion_completion_pct = float(eval_metrics["success_rate_percent"])
+                exp.success_rate = float(eval_metrics["success_rate_percent"])
+                exp.failure_rate = round(100.0 - float(eval_metrics["success_rate_percent"]), 2)
+            else:
+                exp.tracking_error_mae = round(tb_joint_pos_err, 5) if tb_joint_pos_err is not None else None
+                exp.tracking_error_rmse = None
+                exp.r_mpkpe_mm = round(tb_body_pos_err * 1000.0, 2) if tb_body_pos_err is not None else None
+                exp.mpkpe_mm = None
+                exp.anchor_pos_error_m = round(tb_anchor_pos_err, 5) if tb_anchor_pos_err is not None else None
+                exp.anchor_ori_error_rad = round(tb_anchor_rot_err, 5) if tb_anchor_rot_err is not None else None
+                exp.joint_vel_error_rmse = round(tb_joint_vel_err, 4) if tb_joint_vel_err is not None else None
+                exp.hand_ee_error_mm = None
+                exp.foot_ee_error_mm = None
+                exp.motion_completion_pct = None
+                exp.success_rate = None
+                exp.failure_rate = None
+
             exp.duration_sec = wall_dur
-            exp.total_fps = round(float(fps_info.get("final_value", 48000.0)), 0)
+            exp.total_fps = round(float(fps_info["final_value"]), 0) if "final_value" in fps_info else None
             exp.log_dir = str(rdir.relative_to(HIL_ROOT)).replace("\\", "/")
             exp.best_checkpoint_path = best_ckpt_rel
             exp.config_json = json.dumps({
-                "agent": {
-                    "experiment_name": agent_cfg.get("experiment_name", "k1_tracking"),
-                    "run_name": agent_cfg.get("run_name", "beyondmimic_k1_kick"),
-                    "max_iterations": agent_cfg.get("max_iterations", 500),
-                    "save_interval": agent_cfg.get("save_interval", 100),
-                    "num_steps_per_env": agent_cfg.get("num_steps_per_env", 24),
-                    "seed": agent_cfg.get("seed", 42),
-                },
+                "agent": agent_cfg,
                 "environment": {
-                    "robot": "booster_k1 (22-DoF)",
+                    "robot": "booster_k1",
                     "task_id": "Mjlab-Tracking-Flat-Booster-K1",
                     "num_envs": int(env_cfg.get("scene", {}).get("num_envs", 2048)),
                 },
@@ -204,21 +172,10 @@ def sync_filesystem_to_db() -> None:
                 iter_num = int(stem_parts[1]) if len(stem_parts) > 1 and stem_parts[1].isdigit() else 0
 
                 nearest_rew = rew_by_step.get(iter_num, mean_rew)
-                nearest_b_err = b_err_by_step.get(iter_num)
-                nearest_j_err = j_err_by_step.get(iter_num)
-
-                c_mae = round(nearest_j_err / 8.2, 5) if nearest_j_err is not None else mae_rad
-                c_rmse = round(c_mae * 1.45, 5)
-                c_rmpkpe = round(nearest_b_err * 305.0, 2) if nearest_b_err is not None else rmpkpe_mm
+                nearest_b_err = b_err_by_step.get(iter_num, tb_body_pos_err)
+                nearest_j_err = j_err_by_step.get(iter_num, tb_joint_pos_err)
 
                 is_last_in_run = ckpt_idx == len(ckpts_in_dir) - 1
-                if is_latest_run and is_last_in_run and eval_metrics:
-                    c_mae = mae_rad
-                    c_rmse = rmse_rad
-                    c_rmpkpe = rmpkpe_mm
-                    c_succ = succ_rate
-                else:
-                    c_succ = round(min(94.9, max(10.0, succ_rate * (0.65 + 0.35 * (ckpt_idx / max(1, len(ckpts_in_dir) - 1))))), 2)
 
                 ckpt = ckpt_by_path.get(rel_path)
                 if not ckpt:
@@ -239,19 +196,25 @@ def sync_filesystem_to_db() -> None:
                     ckpt_by_path[rel_path] = ckpt
 
                 ckpt.mean_reward = round(float(nearest_rew), 4) if nearest_rew is not None else None
-                ckpt.tracking_error_mae = c_mae
-                ckpt.tracking_error_rmse = c_rmse
-                ckpt.r_mpkpe_mm = c_rmpkpe
-                ckpt.mpkpe_mm = mpkpe_mm
-                ckpt.success_rate = c_succ
-                ckpt.is_best = bool(idx == 3 and is_last_in_run)
                 if is_latest_run and is_last_in_run and eval_metrics:
+                    ckpt.tracking_error_mae = float(eval_metrics["joint_tracking_mae_rad"])
+                    ckpt.tracking_error_rmse = float(eval_metrics["joint_tracking_rmse_rad"])
+                    ckpt.r_mpkpe_mm = float(eval_metrics["r_mpkpe_mm"])
+                    ckpt.mpkpe_mm = float(eval_metrics["mpkpe_mm"])
+                    ckpt.success_rate = float(eval_metrics["success_rate_percent"])
                     ckpt.metrics_json = json.dumps(eval_metrics)
+                else:
+                    ckpt.tracking_error_mae = round(float(nearest_j_err), 5) if nearest_j_err is not None else None
+                    ckpt.tracking_error_rmse = None
+                    ckpt.r_mpkpe_mm = round(float(nearest_b_err) * 1000.0, 2) if nearest_b_err is not None else None
+                    ckpt.mpkpe_mm = None
+                    ckpt.success_rate = None
+                ckpt.is_best = bool(is_latest_run and is_last_in_run)
                 exp_ckpts.append(ckpt)
 
             exp.checkpoints = exp_ckpts
 
-        # Primary output checkpoint
+        # Primary evaluated output checkpoint: outputs/checkpoints/k1_kick_policy.pt
         primary_pt = CHECKPOINTS_DIR / "k1_kick_policy.pt"
         primary_onnx = CHECKPOINTS_DIR / "k1_kick_policy.onnx"
         if primary_pt.exists():
@@ -262,9 +225,9 @@ def sync_filesystem_to_db() -> None:
                 p_ckpt = Checkpoint(
                     id=runtime_store.next_ckpt_id(),
                     experiment_id=None,
-                    experiment_run_id="active_policy",
-                    experiment_name="Active Production Policy",
-                    name="Production Policy — k1_kick_policy.pt (Iter 2495)",
+                    experiment_run_id="evaluated_policy",
+                    experiment_name="outputs/checkpoints/k1_kick_policy.pt",
+                    name="k1_kick_policy.pt (Evaluated Policy)",
                     filename=primary_pt.name,
                     file_path=rel_pt,
                     onnx_path=rel_onnx,
@@ -272,66 +235,62 @@ def sync_filesystem_to_db() -> None:
                     file_size_bytes=primary_pt.stat().st_size,
                     is_best=True,
                     is_primary_output=True,
-                    notes="Active BeyondMimic PPO policy checkpoint (+ ONNX export).",
+                    notes="Evaluated via scripts/evaluate_and_play.py (outputs/evaluation/k1_metrics.json).",
                     created_at=datetime.fromtimestamp(primary_pt.stat().st_mtime, tz=timezone.utc),
                 )
                 runtime_store.checkpoints[p_ckpt.id] = p_ckpt
             if eval_metrics:
-                p_ckpt.mean_reward = 16.4125
-                p_ckpt.tracking_error_mae = float(eval_metrics.get("joint_tracking_mae_rad", 0.14701))
-                p_ckpt.tracking_error_rmse = float(eval_metrics.get("joint_tracking_rmse_rad", 0.21691))
-                p_ckpt.r_mpkpe_mm = float(eval_metrics.get("r_mpkpe_mm", 39.38))
-                p_ckpt.mpkpe_mm = float(eval_metrics.get("mpkpe_mm", 108.34))
-                p_ckpt.success_rate = float(eval_metrics.get("success_rate_percent", 65.62))
+                latest_exp_rew = (
+                    sorted(runtime_store.experiments.values(), key=lambda x: x.final_step)[-1].mean_reward
+                    if runtime_store.experiments
+                    else None
+                )
+                p_ckpt.mean_reward = latest_exp_rew
+                p_ckpt.tracking_error_mae = float(eval_metrics["joint_tracking_mae_rad"])
+                p_ckpt.tracking_error_rmse = float(eval_metrics["joint_tracking_rmse_rad"])
+                p_ckpt.r_mpkpe_mm = float(eval_metrics["r_mpkpe_mm"])
+                p_ckpt.mpkpe_mm = float(eval_metrics["mpkpe_mm"])
+                p_ckpt.success_rate = float(eval_metrics["success_rate_percent"])
                 p_ckpt.metrics_json = json.dumps(eval_metrics)
 
-        # In-memory discovery of existing output videos
-        existing_videos_meta = [
-            ("k1_trained_policy_tracking.mp4", "Booster K1 BeyondMimic PPO Policy Rollout (50 FPS)", "policy", "third_person", "960x720", 50, 296, 5.92, False),
-            ("k1_kick_reference.mp4", "Booster K1 MJLab 50 FPS Kinematic Reference Motion (Kick)", "reference", "third_person", "960x720", 50, 149, 2.98, False),
-            ("k1_side_by_side_comparison.mp4", "Side-by-Side Synchronized Comparison: GMR Reference vs. BeyondMimic Policy", "comparison", "third_person", "1924x720", 50, 296, 5.92, True),
-            ("gmr_retargeted_k1_kick.mp4", "Stage 1 GMR Differential IK Retargeting Preview (Booster K1 Kick)", "gmr_retargeted", "third_person", "960x720", 30, 90, 3.00, False),
-        ]
-        vid_by_job = {v.job_id: v for v in runtime_store.videos.values()}
-        for fname, title, vtype, pov, res, fps, fcount, dur, overlay in existing_videos_meta:
-            vpath = VIDEOS_DIR / fname
-            if vpath.exists():
+        # Discover actual MP4 files present in outputs/videos/
+        if VIDEOS_DIR.exists():
+            vid_by_path = {v.file_path: v for v in runtime_store.videos.values() if v.file_path}
+            for vpath in sorted(VIDEOS_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
                 rel_vpath = str(vpath.relative_to(HIL_ROOT)).replace("\\", "/")
-                job_id = f"existing_{vpath.stem}"
-                if job_id not in vid_by_job:
-                    vrec = VideoRecord(
-                        id=runtime_store.next_vid_id(),
-                        job_id=job_id,
-                        title=title,
-                        video_type=vtype,
-                        camera_pov=pov,
-                        resolution=res,
-                        fps=fps,
-                        playback_speed=1.0,
-                        include_overlay=overlay,
-                        motion_file="data/motions/k1_kick.npz",
-                        checkpoint_path="outputs/checkpoints/k1_kick_policy.pt" if vtype in ("policy", "comparison") else None,
-                        status="completed",
-                        progress=100,
-                        file_path=rel_vpath,
-                        filename=fname,
-                        file_size_bytes=vpath.stat().st_size,
-                        duration_sec=dur,
-                        frame_count=fcount,
-                        created_at=datetime.fromtimestamp(vpath.stat().st_mtime, tz=timezone.utc),
-                    )
-                    runtime_store.videos[vrec.id] = vrec
-
-        if not runtime_store.activities:
-            runtime_store.add_activity(
-                "system",
-                "Stateless In-Memory Monitoring Active (No Database)",
-                "Platform running in ephemeral live-monitoring mode. Simulation states are discarded immediately upon reset/stop.",
-                "success",
-            )
-            runtime_store.add_activity(
-                "evaluation",
-                "Live Policy Ready: k1_kick_policy.pt",
-                "Booster K1 (22-DoF) Martial-Arts Kick policy loaded in memory (Joint MAE = 0.147 rad, R-MPKPE = 39.38 mm).",
-                "info",
-            )
+                if rel_vpath in vid_by_path:
+                    continue
+                fname = vpath.name
+                vtype = (
+                    "comparison"
+                    if "comparison" in fname
+                    else "reference"
+                    if "reference" in fname
+                    else "gmr_retargeted"
+                    if "gmr" in fname
+                    else "error_overlay"
+                    if "error_overlay" in fname
+                    else "policy"
+                )
+                vrec = VideoRecord(
+                    id=runtime_store.next_vid_id(),
+                    job_id=f"existing_{vpath.stem}",
+                    title=fname,
+                    video_type=vtype,
+                    camera_pov="first_person" if "first_person" in fname else "third_person",
+                    resolution="1924x720" if vtype == "comparison" else "960x720",
+                    fps=30 if "gmr" in fname else 50,
+                    playback_speed=1.0,
+                    include_overlay=("comparison" in fname or "error_overlay" in fname),
+                    motion_file="data/motions/k1_kick.npz",
+                    checkpoint_path="outputs/checkpoints/k1_kick_policy.pt" if vtype in ("policy", "comparison", "error_overlay") else None,
+                    status="completed",
+                    progress=100,
+                    file_path=rel_vpath,
+                    filename=fname,
+                    file_size_bytes=vpath.stat().st_size,
+                    duration_sec=0.0,
+                    frame_count=0,
+                    created_at=datetime.fromtimestamp(vpath.stat().st_mtime, tz=timezone.utc),
+                )
+                runtime_store.videos[vrec.id] = vrec

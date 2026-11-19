@@ -72,46 +72,55 @@ export default function MotionAnalysisTab({ trajectory }: MotionAnalysisTabProps
     [jointSummaries]
   );
 
+  if (!trajectory) {
+    return (
+      <div className="bento-card p-8 text-center text-xs font-mono text-zinc-500">
+        Memuat data trajektori 22-DoF dari `/api/simulation/trajectory`...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {/* Top KPI Bento Cards */}
+      {/* Top KPI Bento Cards (100% Real Trajectory Bundle Data) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bento-card p-4">
           <span className="text-xs text-zinc-400 font-medium">Reference Motion</span>
           <div className="mt-1 font-mono text-sm font-bold text-zinc-900 dark:text-white truncate">
-            {trajectory?.motion_file || "data/motions/k1_kick.npz"}
+            {trajectory.motion_file}
           </div>
-          <div className="mt-1 text-[11px] text-zinc-400">Martial-Arts Front Kick (GMR → MJLab)</div>
+          <div className="mt-1 text-[11px] font-mono text-zinc-400 truncate">
+            Policy: {trajectory.checkpoint_file}
+          </div>
         </div>
 
         <div className="bento-card p-4">
           <span className="text-xs text-zinc-400 font-medium">Duration & Frames</span>
           <div className="mt-1 font-mono text-lg font-extrabold text-zinc-900 dark:text-white">
-            {trajectory?.duration_sec ?? 2.98}s ({trajectory?.frame_count ?? 149}f)
+            {trajectory.duration_sec}s ({trajectory.frame_count}f)
           </div>
-          <div className="mt-1 text-[11px] font-semibold text-lime-600">
-            {trajectory?.fps ?? 50} FPS Control (dt = 0.02s)
+          <div className="mt-1 text-[11px] font-semibold text-lime-600 font-mono">
+            {trajectory.fps} FPS (dt = {trajectory.dt}s)
           </div>
         </div>
 
         <div className="bento-card p-4">
           <span className="text-xs text-zinc-400 font-medium">Mean Joint MAE</span>
           <div className="mt-1 font-mono text-lg font-extrabold text-lime-600 dark:text-lime-400">
-            {trajectory?.overall_metrics?.joint_mae_rad ?? 0.147} rad (
-            {trajectory?.overall_metrics?.joint_mae_deg ?? 8.42}°)
+            {trajectory.overall_metrics.joint_mae_rad} rad ({trajectory.overall_metrics.joint_mae_deg}°)
           </div>
           <div className="mt-1 text-[11px] font-mono text-zinc-400">
-            RMSE: {trajectory?.overall_metrics?.joint_rmse_rad ?? 0.217} rad
+            RMSE: {trajectory.overall_metrics.joint_rmse_rad} rad
           </div>
         </div>
 
         <div className="bento-card p-4">
           <span className="text-xs text-zinc-400 font-medium">Keybody R-MPKPE</span>
           <div className="mt-1 font-mono text-lg font-extrabold text-zinc-900 dark:text-white">
-            {trajectory?.overall_metrics?.r_mpkpe_mm ?? 39.38} mm
+            {trajectory.overall_metrics.r_mpkpe_mm} mm
           </div>
           <div className="mt-1 text-[11px] font-mono text-zinc-400">
-            World MPKPE: {trajectory?.overall_metrics?.mpkpe_mm ?? 108.34} mm
+            World MPKPE: {trajectory.overall_metrics.mpkpe_mm} mm
           </div>
         </div>
 
@@ -120,10 +129,10 @@ export default function MotionAnalysisTab({ trajectory }: MotionAnalysisTabProps
             <AlertTriangle className="w-3.5 h-3.5" /> High-Error Joints (&ge;0.20 rad)
           </span>
           <div className="mt-1 font-mono text-lg font-extrabold text-orange-500">
-            {highErrorJoints.length} / 22 Joints
+            {highErrorJoints.length} / {jointSummaries.length} Joints
           </div>
           <div className="mt-1 text-[11px] font-mono text-zinc-400 truncate">
-            {highErrorJoints.map((j) => j.name).join(", ")}
+            {highErrorJoints.map((j) => j.name).join(", ") || "None"}
           </div>
         </div>
       </div>
@@ -165,7 +174,7 @@ export default function MotionAnalysisTab({ trajectory }: MotionAnalysisTabProps
 
         <div className="flex items-center gap-3 text-xs font-mono flex-1 max-w-md">
           <span className="text-zinc-500 whitespace-nowrap">
-            Frame {currentFrame} ({(currentFrame * 0.02).toFixed(2)}s):
+            Frame {currentFrame} ({(currentFrame * trajectory.dt).toFixed(2)}s):
           </span>
           <input
             type="range"
@@ -213,7 +222,7 @@ export default function MotionAnalysisTab({ trajectory }: MotionAnalysisTabProps
                   contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e4e4e7", borderRadius: "12px", fontSize: "12px" }}
                 />
                 <Legend wrapperStyle={{ fontSize: "12px" }} />
-                <ReferenceLine x={Number((currentFrame * 0.02).toFixed(3))} stroke="#18181b" strokeDasharray="3 3" />
+                <ReferenceLine x={Number((currentFrame * trajectory.dt).toFixed(3))} stroke="#18181b" strokeDasharray="3 3" />
                 <Line
                   type="monotone"
                   dataKey="ref_angle_rad"
@@ -242,7 +251,7 @@ export default function MotionAnalysisTab({ trajectory }: MotionAnalysisTabProps
               Instantaneous Joint Tracking Error: |q_sim(t) - q_ref(t)|
             </h3>
             <p className="text-xs text-zinc-400 font-mono">
-              Highlights peak deviation phases during dynamic single-leg kick apex
+              Max Error: {selectedJointMeta?.max_error_rad} rad ({selectedJointMeta?.max_error_deg}°)
             </p>
           </div>
           <div className="h-64">

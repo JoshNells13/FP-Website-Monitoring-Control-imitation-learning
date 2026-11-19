@@ -41,13 +41,8 @@ def get_overview():
     )
 
     eval_metrics = get_primary_evaluation_metrics()
-    avg_mae_rad = float(eval_metrics.get("joint_tracking_mae_rad", 0.14701))
-    avg_mae_deg = float(eval_metrics.get("joint_tracking_mae_deg", 8.423))
-    avg_rmse_rad = float(eval_metrics.get("joint_tracking_rmse_rad", 0.21691))
-    r_mpkpe_mm = float(eval_metrics.get("r_mpkpe_mm", 39.38))
-    mpkpe_mm = float(eval_metrics.get("mpkpe_mm", 108.34))
-    success_rate = float(eval_metrics.get("success_rate_percent", 65.62))
-    failure_rate = round(100.0 - success_rate, 2)
+    succ_rate = eval_metrics.get("success_rate_percent")
+    fail_rate = round(100.0 - float(succ_rate), 2) if succ_rate is not None else None
 
     total_duration_sec = round(sum(float(e.duration_sec or 0.0) for e in all_exps), 1)
     recent_activities = [
@@ -56,15 +51,16 @@ def get_overview():
     ]
 
     progression = get_combined_training_progression(max_points=180)
+    peak_reward = max((float(r["mean_reward"]) for r in progression if "mean_reward" in r), default=None)
 
     per_joint_list = []
     for jname, jvals in eval_metrics.get("per_joint_metrics", {}).items():
         per_joint_list.append({
             "joint": jname,
-            "mae_rad": jvals.get("mae_rad", 0.0),
-            "mae_deg": jvals.get("mae_deg", 0.0),
-            "rmse_rad": jvals.get("rmse_rad", 0.0),
-            "rmse_deg": jvals.get("rmse_deg", 0.0),
+            "mae_rad": jvals.get("mae_rad"),
+            "mae_deg": jvals.get("mae_deg"),
+            "rmse_rad": jvals.get("rmse_rad"),
+            "rmse_deg": jvals.get("rmse_deg"),
         })
 
     return jsonify({
@@ -74,17 +70,32 @@ def get_overview():
             "running_experiments": running_exps,
             "completed_experiments": completed_exps,
             "failed_experiments": failed_exps,
-            "avg_tracking_error_mae_rad": avg_mae_rad,
-            "avg_tracking_error_mae_deg": avg_mae_deg,
-            "avg_tracking_error_rmse_rad": avg_rmse_rad,
-            "r_mpkpe_mm": r_mpkpe_mm,
-            "mpkpe_mm": mpkpe_mm,
-            "success_rate": success_rate,
-            "failure_rate": failure_rate,
+            "latest_mean_reward": latest_exp.mean_reward if latest_exp else None,
+            "peak_mean_reward": round(peak_reward, 4) if peak_reward is not None else None,
+            "latest_episode_length": latest_exp.mean_episode_length if latest_exp else None,
+            "avg_tracking_error_mae_rad": eval_metrics.get("joint_tracking_mae_rad"),
+            "avg_tracking_error_mae_deg": eval_metrics.get("joint_tracking_mae_deg"),
+            "avg_tracking_error_rmse_rad": eval_metrics.get("joint_tracking_rmse_rad"),
+            "avg_tracking_error_rmse_deg": eval_metrics.get("joint_tracking_rmse_deg"),
+            "joint_velocity_mae_rad_s": eval_metrics.get("joint_velocity_mae_rad_s"),
+            "joint_velocity_rmse_rad_s": eval_metrics.get("joint_velocity_rmse_rad_s"),
+            "r_mpkpe_mm": eval_metrics.get("r_mpkpe_mm"),
+            "mpkpe_mm": eval_metrics.get("mpkpe_mm"),
+            "hand_ee_error_mm": eval_metrics.get("end_effector_hand_error_mm"),
+            "foot_ee_error_mm": eval_metrics.get("end_effector_foot_error_mm"),
+            "anchor_orientation_error_rad": eval_metrics.get("anchor_orientation_error_rad"),
+            "anchor_orientation_error_deg": eval_metrics.get("anchor_orientation_error_deg"),
+            "num_eval_episodes": eval_metrics.get("num_eval_episodes"),
+            "num_completed_episodes": eval_metrics.get("num_completed_episodes"),
+            " trajectory_frames_50fps": eval_metrics.get("trajectory_frames_50fps"),
+            "trajectory_duration_sec": eval_metrics.get("trajectory_duration_sec"),
+            "success_rate": succ_rate,
+            "failure_rate": fail_rate,
             "total_training_duration_sec": total_duration_sec,
             "total_checkpoints": len(all_ckpts),
             "total_videos": len(runtime_store.videos),
         },
+        "evaluation_metrics": eval_metrics,
         "latest_session": latest_exp.to_dict(include_details=False) if latest_exp else None,
         "best_checkpoint": best_ckpt.to_dict() if best_ckpt else None,
         "experiments": [e.to_dict(include_details=False) for e in all_exps],

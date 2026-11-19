@@ -18,19 +18,16 @@ import {
   Cpu,
   Box,
   Activity,
-  BarChart3,
-  Video,
   FolderKanban,
   Award,
   Settings,
-  Search,
-  Bell,
   Plus,
   Zap,
   ChevronsLeft,
   ChevronsRight,
   ChevronDown,
   RefreshCw,
+  Radio,
 } from "lucide-react";
 
 export default function PlatformPage() {
@@ -38,7 +35,6 @@ export default function PlatformPage() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [telemetryGroupOpen, setTelemetryGroupOpen] = useState<boolean>(true);
-  const [searchQuery, setSearchQuery] = useState<string>("");
   const [socketConnected, setSocketConnected] = useState<boolean>(false);
 
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -162,38 +158,43 @@ export default function PlatformPage() {
 
   return (
     <div className="min-h-screen flex bg-[#F3F4F6] dark:bg-[#0b0f17] text-zinc-900 dark:text-zinc-100 p-3 sm:p-4 gap-5">
-      {/* Left ACRU-Style Minimalist Sidebar */}
+      {/* Left Minimalist Bento Sidebar */}
       <aside
-        className={`${sidebarCollapsed ? "w-20" : "w-60"
-          } shrink-0 flex flex-col justify-between transition-all duration-200 select-none`}
+        className={`${
+          sidebarCollapsed ? "w-20" : "w-60"
+        } shrink-0 flex flex-col justify-between transition-all duration-200 select-none`}
       >
         <div>
-          {/* Brand Logo */}
           <div className="px-3 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-lime-400 text-white dark:text-zinc-950 flex items-center justify-center font-black text-sm tracking-tighter">
-                JJ
+                K1
               </div>
               {!sidebarCollapsed && (
-                <span className="italic text-xl font-black tracking-tight text-zinc-900 dark:text-white">
-                  JosJiss
+                <span className="text-xl font-black tracking-tight text-zinc-900 dark:text-white">
+                  MJLAB
                 </span>
               )}
             </div>
             {!sidebarCollapsed && (
               <span
-                className={`h-2.5 w-2.5 rounded-full ${socketConnected ? "bg-lime-500" : "bg-amber-400"
-                  }`}
+                className={`h-2.5 w-2.5 rounded-full ${
+                  socketConnected ? "bg-lime-500" : "bg-amber-400"
+                }`}
                 title={socketConnected ? "Socket.IO Live Connected" : "Polling"}
               />
             )}
           </div>
 
-          {/* Primary Navigation List */}
           <nav className="mt-4 space-y-1">
             {[
               { id: "overview", label: "Dashboard", icon: LayoutGrid },
-              { id: "training", label: "Training Center", icon: Cpu, badge: trainStatus === "running" ? "LIVE" : undefined },
+              {
+                id: "training",
+                label: "Training Center",
+                icon: Cpu,
+                badge: trainStatus === "running" ? "LIVE" : undefined,
+              },
               { id: "simulation", label: "3D Simulation", icon: Box },
             ].map((item) => {
               const Icon = item.icon;
@@ -202,10 +203,11 @@ export default function PlatformPage() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-medium transition ${isActive
-                    ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-800/40"
-                    }`}
+                  className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-medium transition ${
+                    isActive
+                      ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
+                      : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-800/40"
+                  }`}
                 >
                   {isActive && (
                     <span className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-zinc-900 dark:bg-lime-400 rounded-r-full" />
@@ -223,7 +225,6 @@ export default function PlatformPage() {
               );
             })}
 
-            {/* Expandable Tree Section (like "Transactions" with vertical guide line in reference image) */}
             <div>
               <button
                 onClick={() => setTelemetryGroupOpen(!telemetryGroupOpen)}
@@ -235,8 +236,9 @@ export default function PlatformPage() {
                 </span>
                 {!sidebarCollapsed && (
                   <ChevronDown
-                    className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${telemetryGroupOpen ? "rotate-180" : ""
-                      }`}
+                    className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${
+                      telemetryGroupOpen ? "rotate-180" : ""
+                    }`}
                   />
                 )}
               </button>
@@ -244,19 +246,30 @@ export default function PlatformPage() {
               {telemetryGroupOpen && !sidebarCollapsed && (
                 <div className="ml-5 pl-3 border-l border-zinc-300 dark:border-zinc-700 my-1 space-y-1">
                   {[
-                    { id: "motion", label: "Motion Analysis", count: "22" },
+                    {
+                      id: "motion",
+                      label: "Motion Analysis",
+                      count: trajectory?.per_joint_summary?.length
+                        ? String(trajectory.per_joint_summary.length)
+                        : undefined,
+                    },
                     { id: "analytics", label: "Analytics & Plots" },
-                    { id: "videos", label: "Video Studio", count: String(videos.length || 5) },
+                    {
+                      id: "videos",
+                      label: "Video Studio",
+                      count: videos.length > 0 ? String(videos.length) : undefined,
+                    },
                   ].map((sub) => {
                     const isSubActive = activeTab === sub.id;
                     return (
                       <button
                         key={sub.id}
                         onClick={() => setActiveTab(sub.id)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition ${isSubActive
-                          ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
-                          : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                          }`}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition ${
+                          isSubActive
+                            ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
+                            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                        }`}
                       >
                         <span>{sub.label}</span>
                         {sub.count && (
@@ -273,7 +286,12 @@ export default function PlatformPage() {
 
             {[
               { id: "experiments", label: "Experiments", icon: FolderKanban },
-              { id: "checkpoints", label: "Checkpoints", icon: Award, badge: String(checkpoints.length || 31) },
+              {
+                id: "checkpoints",
+                label: "Checkpoints",
+                icon: Award,
+                badge: checkpoints.length > 0 ? String(checkpoints.length) : undefined,
+              },
               { id: "settings", label: "System Settings", icon: Settings },
             ].map((item) => {
               const Icon = item.icon;
@@ -282,10 +300,11 @@ export default function PlatformPage() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-medium transition ${isActive
-                    ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-800/40"
-                    }`}
+                  className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-medium transition ${
+                    isActive
+                      ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
+                      : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-800/40"
+                  }`}
                 >
                   {isActive && (
                     <span className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-zinc-900 dark:bg-lime-400 rounded-r-full" />
@@ -305,8 +324,8 @@ export default function PlatformPage() {
           </nav>
         </div>
 
-        {/* Bottom Sidebar Card (Styled like "Upgrade to Pro!" card in reference image) */}
-        {/* <div className="space-y-3">
+        {/* Bottom Stateless Ephemeral Control Card */}
+        <div className="space-y-3">
           {!sidebarCollapsed && (
             <div className="bento-card p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -322,7 +341,7 @@ export default function PlatformPage() {
                   Stateless Live Monitor
                 </div>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
-                  No database used. Simulation buffers discard automatically on reset.
+                  No database used. Simulation buffers discard immediately on reset.
                 </p>
               </div>
               <button
@@ -350,31 +369,41 @@ export default function PlatformPage() {
               </>
             )}
           </button>
-        </div> */}
+        </div>
       </aside>
 
       {/* Main Content Workspace */}
       <div className="flex-1 flex flex-col min-w-0 gap-5">
-        {/* Top Floating Header Bar (Styled like ACRU Quick Search + Profile + Add Widget) */}
+        {/* Top Header Bar: 100% Real Live Telemetry & Actions (Zero dummy elements) */}
         <header className="flex flex-wrap items-center justify-between gap-3">
-          {/* Quick Search Pill */}
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Quick search joints, policies, POV..."
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 shadow-[0_2px_10px_rgba(15,23,42,0.02)] focus:outline-none focus:ring-2 focus:ring-lime-400"
-            />
+          <div className="flex flex-wrap items-center gap-2.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl px-4 py-2.5 text-xs shadow-[0_2px_10px_rgba(15,23,42,0.02)]">
+            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-900 dark:text-white">
+              <Radio
+                className={`w-3.5 h-3.5 ${
+                  socketConnected ? "text-lime-500" : "text-amber-500"
+                }`}
+              />
+              {socketConnected ? "SOCKET.IO LIVE" : "REST POLLING"}
+            </span>
+            <span className="text-zinc-300 dark:text-zinc-700">|</span>
+            <span className="font-mono text-zinc-600 dark:text-zinc-300">
+              Process: <strong className="uppercase text-zinc-900 dark:text-white">{trainStatus}</strong>
+            </span>
+            {resources?.cpu && (
+              <>
+                <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                <span className="font-mono text-zinc-500">
+                  CPU: {resources.cpu.percent}% • RAM: {resources.ram?.used_gb}/{resources.ram?.total_gb} GB
+                </span>
+              </>
+            )}
           </div>
 
-          {/* Right Action Pills */}
           <div className="flex items-center gap-2.5">
             <button
               onClick={fetchCoreData}
               className="w-10 h-10 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 shadow-sm transition"
-              title="Refresh Live Telemetry"
+              title="Sync Live Filesystem & Telemetry"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -387,33 +416,32 @@ export default function PlatformPage() {
               <Settings className="w-4 h-4" />
             </button>
 
-            {/* Operator Badge Pill */}
-            <div className="hidden md:flex items-center gap-2.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-full pl-2 pr-4 py-1.5 shadow-sm">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-lime-500 to-emerald-500 text-white font-bold text-xs flex items-center justify-center">
-                BK
-              </div>
-              <div className="leading-tight">
-                <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                  Booster K1 (22-DoF)
+            {resources?.gpu && (
+              <div className="hidden md:flex items-center gap-2.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-full pl-2 pr-4 py-1.5 shadow-sm">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-lime-500 to-emerald-500 text-white font-bold text-xs flex items-center justify-center font-mono">
+                  K1
                 </div>
-                <div className="text-[10px] text-zinc-400 font-mono">
-                  {resources?.gpu?.name || "RTX 5070 • MuJoCo-Warp"}
+                <div className="leading-tight">
+                  <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                    {resources.gpu.name}
+                  </div>
+                  <div className="text-[10px] text-zinc-400 font-mono">
+                    VRAM: {resources.gpu.vram_used_gb} / {resources.gpu.vram_total_gb} GB ({resources.gpu.utilization_percent}% util)
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Primary CTA Pill (like "+ Add widget" in reference image) */}
             <button
               onClick={() => setActiveTab("training")}
               className="flex items-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/90 dark:border-zinc-800 rounded-full px-4 py-2.5 text-xs font-semibold text-zinc-900 dark:text-white shadow-sm transition"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>New Training</span>
+              <span>Training Control</span>
             </button>
           </div>
         </header>
 
-        {/* Active View Content */}
         <main className="flex-1">
           {activeTab === "overview" && (
             <OverviewTab
