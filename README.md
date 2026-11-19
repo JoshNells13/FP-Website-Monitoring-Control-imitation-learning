@@ -1,11 +1,11 @@
 # Humanoid Imitation Learning Control & Visualization Platform — Booster K1 (22-DoF)
 
-Platform berbasis web (**Next.js 14 Bento UI + Flask + Socket.IO + Three.js + MuJoCo**) untuk mengontrol, memantau secara *real-time* (*Stateless Ephemeral In-Memory Monitoring* tanpa database), memvisualisasikan simulasi 3D, menganalisis trajektori 22 sendi, serta mengekspor video MP4 dari *pipeline* **Humanoid Whole-Body Motion Imitation Learning (`GMR + BeyondMimic + MJLab / MuJoCo-Warp`)** pada robot **Booster K1 (22-DoF)**.
+Platform berbasis web (**Next.js 14 Bento UI + Flask + Socket.IO + Three.js + MuJoCo**) untuk mengontrol, memantau secara *real-time* (**Stateless Ephemeral In-Memory Monitoring — Tanpa Database & Tanpa Data Dummy**), memvisualisasikan simulasi 3D, menganalisis trajektori 22 sendi, serta mengekspor video MP4 dari *pipeline* **Humanoid Whole-Body Motion Imitation Learning (`GMR + BeyondMimic + MJLab / MuJoCo-Warp`)** pada robot **Booster K1 (22-DoF)**.
 
 ---
 
 ## Daftar Isi
-1. [Arsitektur & Struktur Direktori](#1-arsitektur--struktur-direktori)
+1. [Arsitektur & Prinsip 100% Data Asli (Zero Dummy Data & Zero Database)](#1-arsitektur--prinsip-100-data-asli-zero-dummy-data--zero-database)
 2. [Bagaimana Backend & Frontend Terhubung ke Folder Simulasi (`human-imitation-learning`)](#2-bagaimana-backend--frontend-terhubung-ke-folder-simulasi-human-imitation-learning)
 3. [Dokumentasi & Cara Menjalankan Backend (Flask + Socket.IO)](#3-dokumentasi--cara-menjalankan-backend-flask--socketio)
 4. [Dokumentasi & Cara Menjalankan Frontend (Next.js Bento UI)](#4-dokumentasi--cara-menjalankan-frontend-nextjs-bento-ui)
@@ -15,11 +15,21 @@ Platform berbasis web (**Next.js 14 Bento UI + Flask + Socket.IO + Three.js + Mu
 
 ---
 
-## 1. Arsitektur & Struktur Direktori
+## 1. Arsitektur & Prinsip 100% Data Asli (Zero Dummy Data & Zero Database)
 
-Proyek ini terdiri dari dua folder utama yang berdampingan di dalam satu *workspace* (`fp-ichiro/`):
-- **`human-imitation-learning/`**: Folder utama *engine* simulasi fisika MuJoCo-Warp, *General Motion Retargeting* (GMR), dan *Reinforcement Learning* PPO BeyondMimic di MJLab.
-- **`monitoring-control-imitation/`**: Folder platform web (*Backend Flask* + *Frontend Next.js*) yang mengontrol dan memvisualisasikan `human-imitation-learning/`.
+Platform ini dirancang dengan dua prinsip utama:
+1. **100% Data Asli dari Pipeline Simulasi (Tanpa Data Dummy / Tanpa Angka Fallback Statis)**:
+   - Seluruh angka, grafik, tabel sendi, dan kartu di Frontend diambil langsung dari file hasil eksekusi MJLab di folder `human-imitation-learning`:
+     - **Log TensorBoard Asli**: `logs/rsl_rl/k1_tracking/<run_dir>/events.out.tfevents.*` (`Train/mean_reward`, `Train/mean_episode_length`, `Loss/value`, `Loss/surrogate`, `Metrics/motion/error_body_pos`, `Metrics/motion/error_joint_pos`, `Episode_Reward/*`, `Episode_Termination/*`, `Perf/total_fps`).
+     - **Metrik Evaluasi Kuantitatif Asli**: `outputs/evaluation/k1_metrics.json` (`joint_tracking_mae_rad`, `joint_tracking_rmse_rad`, `r_mpkpe_mm`, `mpkpe_mm`, `end_effector_hand_error_mm`, `end_effector_foot_error_mm`, `anchor_orientation_error_rad`, `success_rate_percent`, dan `per_joint_metrics` untuk 22 sendi).
+     - **Trajektori Kinematik & Rollout Fisika Asli**: `data/motions/k1_kick.npz` (referensi GMR 149 frame @ 50 FPS) dan `outputs/evaluation/k1_rollout_trajectory.npz` (*rollout* tertutup *policy* PPO di MuJoCo-Warp).
+     - **Telemetri Hardware Asli**: Utilisasi CPU, RAM, GPU CUDA, dan VRAM langsung dari `psutil` dan `nvidia-smi`.
+   - Jika suatu metrik belum dievaluasi atau proses training sedang `idle`, UI akan menampilkan **`—`** (bukan angka karangan/dummy).
+2. **Stateless Ephemeral In-Memory Monitoring (Tanpa Database)**:
+   - Tidak menggunakan PostgreSQL maupun file SQLite (`.db`).
+   - Seluruh status monitoring berjalan di RAM (`EphemeralRuntimeStore`). Begitu simulasi di-*reset* atau tombol **Discard Sim Buffer** ditekan, *buffer* simulasi langsung dibuang dari memori.
+
+### Struktur Direktori Workspace
 
 ```text
 fp-ichiro/
@@ -60,7 +70,7 @@ fp-ichiro/
     │   │   ├── app/                          # Layout, Global Styles (.bento-card), & Halaman Utama (page.tsx)
     │   │   ├── components/
     │   │   │   ├── RobotCanvas3D.tsx         # 3D Three.js / React Three Fiber Viewer (23 Mesh STL + 6 POV)
-    │   │   │   └── views/                    # 9 Komponen Halaman Modul (Overview, Training, Simulation, dll.)
+    │   │   │   └── views/                    # 9 Komponen Halaman Modul (100% Real Pipeline Data)
     │   │   └── lib/api.ts                    # Klien HTTP Fetch & Koneksi Singleton Socket.IO ke Port 5000
     │   ├── next.config.mjs                   # Proxy rewrite otomatis /api/* & /socket.io/* ke Port 5000
     │   └── package.json
@@ -75,7 +85,7 @@ fp-ichiro/
 
 ## 2. Bagaimana Backend & Frontend Terhubung ke Folder Simulasi (`human-imitation-learning`)
 
-Hubungan antara **Frontend (`Port 3000`)**, **Backend (`Port 5000`)**, dan **Folder Simulasi (`human-imitation-learning`)** berjalan secara **otomatis dan langsung (*direct integration*)** tanpa duplikasi *pipeline*:
+Hubungan antara **Frontend (`Port 3000`)**, **Backend (`Port 5000`)**, dan **Folder Simulasi (`human-imitation-learning`)** berjalan secara **otomatis dan langsung (*direct integration*)**:
 
 ```mermaid
 flowchart LR
@@ -85,7 +95,7 @@ flowchart LR
 
     FE <-->|"REST API (/api/*)\n& WebSocket (Socket.IO)"| BE
     BE -->|"1. Eksekusi Subprocess\n(.venv/Scripts/python.exe)"| HIL
-    BE <-->|"2. Baca Mesh 3D (.STL),\nXML, Motion (.npz), & TensorBoard"| HIL
+    BE <-->|"2. Baca Mesh 3D (.STL), XML,\nk1_metrics.json, .npz & TensorBoard"| HIL
 ```
 
 ### A. Jembatan Konfigurasi di `backend/config.py`
@@ -111,26 +121,14 @@ Dari `HIL_ROOT` tersebut, Backend langsung memetakan seluruh komponen simulasi a
    - Mengarah ke `human-imitation-learning/third_party/GMR/assets/booster_k1/k1_mjlab.xml` dan folder `meshes/*.STL`.
    - Endpoint `/api/simulation/meshes/<nama_file>.STL` mengirimkan ke-23 file mesh `.STL` asli (`Trunk.STL`, `Head_1.STL`, `Head_2.STL`, lengan, paha, betis, dan kaki) langsung ke komponen Three.js (`RobotCanvas3D.tsx`) di Frontend.
 4. **Pembacaan Data Gerakan (`MOTIONS_DIR`) & Rollout Simulasi (`EVALUATION_DIR`)**:
-   - Membaca `data/motions/k1_kick.npz` (149 frame @ 50 FPS gerakan referensi GMR) dan `outputs/evaluation/k1_rollout_trajectory.npz` (hasil *rollout* tertutup *policy* PPO di MJLab) untuk membandingkan posisi 3D, kuaternion orientasi, sudut sendi, dan kecepatan 22 sendi pada setiap frame.
+   - Membaca `data/motions/k1_kick.npz` (149 frame @ 50 FPS gerakan referensi GMR), `outputs/evaluation/k1_rollout_trajectory.npz` (hasil *rollout* tertutup *policy* PPO di MJLab), serta `outputs/evaluation/k1_metrics.json`.
 5. **Pembacaan Log TensorBoard (`LOGS_DIR`) & Checkpoint (`CHECKPOINTS_DIR`)**:
-   - Membaca file `events.out.tfevents.*` di `logs/rsl_rl/k1_tracking/<nama_run>/` menggunakan `EventAccumulator` secara langsung ke RAM tanpa database.
-
-> **Catatan Keamanan (`safe_resolve_in_hil`)**: Fungsi validasi di [`system_monitor.py`](./backend/app/utils/system_monitor.py) memastikan bahwa semua *path* file yang diminta dari Frontend harus berada di dalam direktori `human-imitation-learning` dan memvalidasi tipe setiap parameter sebelum menjalankan subprocess (mencegah *arbitrary shell command execution*).
-
-### B. Koneksi Frontend ke Backend (`frontend/src/lib/api.ts`)
-- Pada [`frontend/src/lib/api.ts`](./frontend/src/lib/api.ts), `API_BASE` diatur secara default ke `http://127.0.0.1:5000`.
-- Pada [`frontend/next.config.mjs`](./frontend/next.config.mjs), terdapat aturan *rewrite proxy* sehingga request ke `/api/*` dan `/socket.io/*` otomatis diteruskan ke `http://127.0.0.1:5000`.
-- Koneksi **Socket.IO** diinisialisasi otomatis ketika aplikasi dibuka. Indikator titik hijau di bagian atas sidebar menandakan WebSocket antara Frontend dan Backend sedang terhubung secara *live*.
+   - Membaca file `events.out.tfevents.*` di `logs/rsl_rl/k1_tracking/<nama_run>/` menggunakan `EventAccumulator` secara langsung ke RAM tanpa fabrikasi metrik.
 
 ---
 
 ## 3. Dokumentasi & Cara Menjalankan Backend (Flask + Socket.IO)
 
-### Karakteristik Backend
-- **Stateless Ephemeral In-Memory Mode (Tanpa Database)**: Tidak memerlukan instalasi PostgreSQL maupun file database SQLite. Seluruh status monitoring disimpan di RAM selama sesi berjalan melalui [`EphemeralRuntimeStore`](./backend/app/models/database.py).
-- **Sekali Simulasi Langsung Dibuang**: Ketika simulasi dihentikan atau tombol **Discard Sim Buffer / Reset & Discard Buffer** ditekan, *cache* dan *buffer* simulasi sementara di memori langsung dihapus (`POST /api/simulation/discard`).
-
-### Langkah Menjalankan Backend
 Buka terminal **PowerShell** dan jalankan menggunakan Python dari `.venv` simulasi:
 
 ```powershell
@@ -153,11 +151,6 @@ cd C:\Users\ASUS\Documents\fp-ichiro\monitoring-control-imitation
 
 ## 4. Dokumentasi & Cara Menjalankan Frontend (Next.js Bento UI)
 
-### Karakteristik Frontend
-- Menggunakan **Next.js 14 (App Router)**, **React 18**, **TypeScript**, **Tailwind CSS**, **Recharts**, dan **Three.js (`@react-three/fiber` & `@react-three/drei`)**.
-- Mengusung desain **Clean Bento Grid** (*Off-White Canvas `#F3F4F6`, Crisp White Cards `rounded-[22px]`, Lime Green `#84CC16`, Warm Orange `#FB923C`, dan Deep Charcoal `#18181B`*).
-
-### Langkah Menjalankan Frontend
 1. **(Hanya Pertama Kali)** Instal dependensi Node.js:
    ```powershell
    cd C:\Users\ASUS\Documents\fp-ichiro\monitoring-control-imitation\frontend
@@ -170,9 +163,9 @@ cd C:\Users\ASUS\Documents\fp-ichiro\monitoring-control-imitation
    *(Atau jalankan `.\start_frontend.ps1` dari folder `monitoring-control-imitation`)*
 3. Buka browser dan akses: **`http://localhost:3000`**
 
-> **Tips Cepat (1 Perintah untuk Backend + Frontend)**:
-> Dari folder `monitoring-control-imitation`, Anda cukup menjalankan:
+> **Menjalankan Backend + Frontend Sekaligus (1 Perintah)**:
 > ```powershell
+> cd C:\Users\ASUS\Documents\fp-ichiro\monitoring-control-imitation
 > .\start_platform.ps1
 > ```
 
@@ -180,86 +173,46 @@ cd C:\Users\ASUS\Documents\fp-ichiro\monitoring-control-imitation
 
 ## 5. Panduan Penggunaan Frontend (FE User Guide — 9 Menu Utama)
 
-Berikut panduan penggunaan setiap menu yang ada di sidebar aplikasi:
+Bagian atas aplikasi (**Live System & Socket.IO Status Header**) menampilkan status koneksi WebSocket (`SOCKET.IO LIVE` / `REST POLLING`), status proses training aktif (`IDLE` / `RUNNING` / `PAUSED`), serta pemakaian **CPU, RAM, GPU, dan VRAM** secara *real-time*.
 
-### 1. `Dashboard` (Overview Bento Grid)
-Pusat ringkasan metrik dan kontrol cepat:
-- **Hero Convergence Chart (Kiri Atas)**: Menampilkan kenaikan *Mean Return* (`+16.41`, puncak `+19.70`) dan penurunan residu error sepanjang kurikulum training (`Iter 0` s/d `Iter 2495`). Anda dapat mengganti tampilan antara **Bar View** dan **Line Curve View** di pojok kanan atas grafik.
-- **Joint Tracking Accuracy Threshold (Tengah Kiri)**: Progress bar bergaris diagonal hijau limau yang membandingkan akurasi sudut sendi saat ini (`0.1470 rad` / `8.42°`) terhadap target batas maksimum (`0.2000 rad`).
-- **Kinematic Error Split & Stability Health Gauge (Bawah)**: Menampilkan pembagian persentase error per kelompok anggota tubuh (kaki tendang kanan, kaki tumpu kiri, lengan, kepala) serta busur *gauge* persentase keberhasilan penyelesaian gerakan (`65.62%` / `168 dari 256` episode).
-- **Active Policy Card & Quick Camera POV Launch (Kolom Kanan)**:
-  - Menampilkan *checkpoint* aktif (`k1_kick_policy.pt @ 50 Hz`).
-  - **5 Tombol Kotak Aksi Cepat**: `3D Sim` (buka simulasi 3D), `Train` (buka kontrol training), `Motion` (analisis sendi), `Video` (buat MP4), dan `Discard` (buang *buffer* simulasi dari RAM).
-  - **6 Avatar Bulat Camera POV (`3P`, `FR`, `SD`, `TP`, `OR`, `FP`)**: Klik salah satu lingkaran untuk langsung melompat ke halaman **3D Simulation** dengan sudut kamera tersebut!
+### 1. `Dashboard` (Overview Bento Grid — 100% Data Asli)
+- **Hero TensorBoard Convergence Card (Kiri Atas)**:
+  - Menampilkan nilai terakhir `Train/mean_reward` dan grafik perbandingan `Train/mean_reward` vs `Metrics/motion/error_body_pos (m)` yang diekstrak langsung dari file TensorBoard.
+  - Sisi kanan kartu menampilkan **Peak Logged Reward**, **Evaluated R-MPKPE / World MPKPE** dari `k1_metrics.json`, serta **Latest Mean Episode Length** dan total durasi wall-clock training.
+- **Baris Tengah (2 Kartu Evaluasi `k1_metrics.json`)**:
+  - **Joint Position & Velocity Tracking Error**: Menampilkan progress bar `joint_tracking_mae_rad`, `joint_tracking_rmse_rad`, dan `joint_velocity_rmse_rad_s`.
+  - **End-Effector & Anchor Orientation Error**: Menampilkan `end_effector_hand_error_mm`, `end_effector_foot_error_mm`, dan `anchor_orientation_error_deg` untuk task `Mjlab-Tracking-Flat-Booster-K1`.
+- **Baris Bawah (3 Kartu Evaluasi)**:
+  - **22-DoF Group MAE**: Menghitung rata-rata MAE (radian & persentase kontribusi) untuk 5 kelompok sendi (*Right Leg*, *Left Leg*, *Left Arm*, *Right Arm*, *Head*) langsung dari `per_joint_metrics` di `k1_metrics.json`.
+  - **Motion Completion Gauge**: Menampilkan rasio episode berhasil (`num_completed_episodes / num_eval_episodes`), `success_rate_percent`, `failure_rate`, dan `perturbed_batch_joint_mae_rad`.
+  - **Evaluation Metrics Summary**: Menampilkan perbandingan `R-MPKPE`, `World MPKPE`, `Anchor Orientation Error`, dan `Perturbed Batch RMSE`.
+- **Kolom Kanan (Active Policy Checkpoint & Logged Runs)**:
+  - **Active Policy Checkpoint Card**: Menampilkan metadata asli file `k1_kick_policy.pt` (iterasi, ukuran MB, path `.onnx`, motion reference `.npz`, dan MAE).
+  - **5 Tombol Kontrol Cepat**: `3D Sim`, `Train`, `Motion`, `Video`, dan `Discard` (langsung membuang *buffer* simulasi dari RAM).
+  - **6 Tombol Launch 3D Viewer by Camera POV (`3P`, `FR`, `SD`, `TP`, `OR`, `FP`)**: Klik salah satu untuk langsung membuka simulasi 3D di mode kamera tersebut.
+  - **Logged Training Runs**: Daftar direktori run asli di `logs/rsl_rl/k1_tracking` beserta rentang iterasi, jumlah file checkpoint, durasi, dan nilai return akhir.
 
 ### 2. `Training Center` (Kontrol Proses Training PPO MJLab)
-Digunakan untuk menjalankan atau melanjutkan (*resume*) proses training PPO `scripts/train_ppo.py` langsung dari browser:
 - **Bar Telemetri Hardware (Atas)**: Memantau persentase pemakaian **CPU**, **System RAM**, **GPU Compute (CUDA)**, dan **GPU VRAM** secara *real-time*.
-- **Form Konfigurasi PPO (Kiri)**:
-  - Pilih **Reference Motion** (`data/motions/k1_kick.npz`).
-  - Pilih **Resume From Checkpoint** (pilih `-- Train From Scratch --` untuk melatih dari nol, atau pilih salah satu `model_*.pt` / `k1_kick_policy.pt` untuk *finetuning*).
-  - Atur `Parallel Envs` (default `2048`, turunkan ke `1024` atau `512` jika VRAM penuh), `Max Iters`, `Save Every`, dan `Run Tag`.
-- **Tombol Kontrol Eksekusi**:
-  - **Start PPO**: Menjalankan proses training MJLab di latar belakang.
-  - **Pause**: Membekukan (*suspend*) proses training sementara.
-  - **Resume**: Melanjutkan proses training yang di-*pause*.
-  - **Stop**: Menghentikan proses training dengan aman.
-  - **Evaluate Policy**: Menjalankan `scripts/evaluate_and_play.py` pada *checkpoint* terpilih.
-- **Live Terminal Stream (Kanan Bawah)**: Menampilkan keluaran `stdout`/`stderr` langsung dari proses Python MJLab secara *real-time*.
+- **Form Konfigurasi PPO (Kiri)**: Pilih dataset `.npz`, checkpoint `--resume-from`, jumlah `Parallel Envs`, `Max Iters`, `Save Every`, dan `Run Tag`.
+- **Tombol Eksekusi**: **Start PPO**, **Pause**, **Resume**, **Stop**, dan **Evaluate Policy** (`evaluate_and_play.py`).
+- **Real-Time Telemetry & Terminal Stream (Kanan)**: Menampilkan iterasi aktif, `LIVE MEAN REWARD`, `EPISODE LENGTH`, `BODY POS ERROR`, `JOINT POS ERROR` (menampilkan `—` saat tidak ada proses yang sedang berjalan), serta *stream* log terminal langsung dari subprocess Python.
 
 ### 3. `3D Simulation` (Interactive 3D Humanoid Viewer & 6 Camera POVs)
-Merender robot **Booster K1 (22-DoF)** menggunakan mesh `.STL` asli di ruang 3D WebGL (Three.js):
-- **6 Tombol Camera POV (Tanpa Restart Simulasi)**:
-  1. `1. Third-Person`: Kamera mengikuti tubuh (`Trunk`) robot dari belakang.
-  2. `2. Front View`: Kamera menghadap bagian depan robot.
-  3. `3. Side View`: Kamera dari samping untuk mengamati ketinggian tendangan kaki kanan.
-  4. `4. Top View`: Kamera dari atas (*bird's-eye view*) untuk melihat jejak keseimbangan.
-  5. `5. Free Orbit`: Gunakan *mouse* (klik kiri tahan untuk putar, *scroll* untuk *zoom*, klik kanan tahan untuk geser).
-  6. `6. First-Person (Head POV)`: Kamera ditempelkan langsung pada posisi dan orientasi mata/kepala robot (`Head_2` link) lengkap dengan *HUD Visor Reticle* sehingga Anda melihat persis apa yang dilihat kepala robot saat menendang!
-- **Mode Tampilan**:
-  - `Side-by-Side`: Menampilkan robot referensi GMR (biru transparan) dan robot hasil *policy* PPO (solid) berdampingan.
-  - `Ghost Overlay`: Menumpuk robot referensi dan *policy* di titik yang sama untuk melihat selisih gerakan secara langsung.
-  - `Error Heatmap`: Mewarnai bagian tubuh robot menjadi **Hijau** (error rendah), **Oranye** (error sedang), atau **Merah** (error tinggi $> 75\text{ mm}$) secara dinamis per frame.
-  - `MuJoCo Native Stream`: Membuka jendela *Picture-in-Picture* yang merender frame asli langsung dari *C++ Offscreen Renderer* MuJoCo.
-- **Tombol `Reset & Discard Buffer`**: Menghentikan simulasi dan langsung membuang *buffer* simulasi dari memori server.
+- Merender 23 mesh `.STL` asli **Booster K1** secara *Side-by-Side* maupun *Ghost Overlay* dengan *Error Heatmap* per bagian tubuh.
+- Mendukung **6 Camera POV** tanpa me-*restart* simulasi: `1. Third-Person`, `2. Front View`, `3. Side View`, `4. Top View`, `5. Free Orbit`, dan `6. First-Person (Head POV)` yang ditempelkan pada link `Head_2` robot, ditambah jendela **MuJoCo Native Stream** dan tombol **Reset & Discard Buffer**.
 
 ### 4. `Telemetry & Media` $\rightarrow$ `Motion Analysis`
-Halaman analisis detail untuk ke-22 sendi (*22-DoF*):
-- Pilih **Primary Joint** (misalnya `Right_Hip_Pitch` atau `Right_Knee_Pitch`) dan **Comparison Joint** dari *dropdown*.
-- Menampilkan 4 grafik interaktif:
-  1. Sudut sendi Referensi GMR vs *Policy* PPO (`rad`).
-  2. Residu error instan $|q_{\text{sim}}(t) - q_{\text{ref}}(t)|$ terhadap batas target `0.20 rad`.
-  3. Kecepatan sudut sendi (`rad/s`).
-  4. Ketinggian 3D telapak kaki penendang (`right_foot_link` Z dalam meter).
-- **Tabel 22-DoF di Bawah**: Menyoroti sendi dengan error signifikan (`Significant Error`) dan memungkinkan Anda memfilter berdasarkan tingkat keparahan (`all`, `high`, `moderate`, `optimal`). Klik baris sendi mana pun untuk langsung memuat grafiknya.
+- Menampilkan kurva sudut sendi (`ref` vs `sim`), error instan $|q_{\text{sim}}(t) - q_{\text{ref}}(t)|$, kecepatan sudut sendi (`rad/s`), ketinggian kaki tendang (`right_foot_link` Z), serta tabel lengkap 22 sendi dari trajektori 149 frame @ 50 FPS.
 
 ### 5. `Telemetry & Media` $\rightarrow$ `Analytics & Plots`
-Halaman evaluasi performa dan ekspor laporan ilmiah:
-- **Session Filter**: Filter metrik berdasarkan sesi training tertentu atau seluruh kurikulum (`Iter 0–2495`).
-- **Tombol Ekspor (Kanan Atas)**:
-  - **Export CSV**: Mengunduh tabel deret waktu metrik iterasi dalam format `.csv`.
-  - **Export JSON**: Mengunduh laporan lengkap metrik evaluasi dan kurva training dalam format `.json`.
-  - **Matplotlib Report PNG**: Merender dan membuka grafik ilmiah 4-panel beresolusi tinggi via `Matplotlib`.
-- **Multi-Checkpoint Comparison**: Pilih beberapa *checkpoint* untuk membandingkan penurunan `R-MPKPE (mm)` dan kenaikan `Mean Reward` pada diagram batang.
+- Menampilkan ke-12 metrik evaluasi & TensorBoard asli, grafik 6 komponen *Exponential Tracking Reward*, *Curriculum Sampling Entropy*, perbandingan *checkpoint*, preview plot evaluasi, serta tombol **Export CSV**, **Export JSON**, dan **Matplotlib Report PNG**.
 
 ### 6. `Telemetry & Media` $\rightarrow$ `Video Studio`
-Pusat pembuatan dan pengunduhan video eksperimen `.mp4`:
-- Pilih **Recording Mode**:
-  - `Side-by-Side Comparison (Ref vs Policy)`
-  - `Export Generated Policy Motion as MP4`
-  - `Export Kinematic Reference Motion as MP4`
-  - `Policy Recording with Tracking Error Telemetry HUD Overlay`
-- Pilih salah satu dari **6 Camera POV** (termasuk `First-Person Robot Head_2 POV`), resolusi (`640x480` hingga `1920x1080`), `FPS` (`25`–`60`), dan kecepatan putar (`0.25x` *slow-motion* hingga `2.0x`).
-- Klik **Generate MP4 Experiment Video**: *Job* berjalan secara *asynchronous* di latar belakang (progress bar `0%` $\rightarrow$ `100%` tampil *live*), lalu video langsung dapat diputar di *player* sebelah kanan atau diunduh lewat tombol **Download MP4**.
+- Membuat rekaman video `.mp4` baru secara *asynchronous* di latar belakang melalui MuJoCo Offscreen Renderer + FFmpeg untuk mode *Side-by-Side Comparison*, *Policy Rollout*, *Reference Motion*, maupun *Tracking Error Telemetry HUD Overlay* dengan pilihan 6 Camera POV.
 
-### 7. `Experiments`
-Menampilkan daftar sesi eksperimen beserta deskripsi, rentang iterasi, daftar *checkpoint* terkait, dan konsol **TensorBoard Iteration Log** per sesi.
-
-### 8. `Checkpoints`
-Repositori seluruh file *policy* PyTorch (`.pt`) dan ONNX (`.onnx`). Anda dapat mengklik **3D Viewer** pada *checkpoint* mana saja untuk memuat *checkpoint* tersebut ke simulasi 3D, atau mengunduh file `.PT` dan `.ONNX`-nya.
-
-### 9. `System Settings`
-Menampilkan informasi *path* integrasi repositori `human-imitation-learning`, status **Stateless Ephemeral In-Memory Monitoring (No Database Used)**, spesifikasi simulator, serta tombol pengubah tema **Light / Dark Mode**.
+### 7. `Experiments`, 8. `Checkpoints`, & 9. `System Settings`
+- Mengelola sesi eksperimen & log TensorBoard per sesi, mengunduh file `.PT` / `.ONNX` atau memuatnya ke 3D Viewer, serta memeriksa konfigurasi *path* integrasi MJLab dan mengganti tema **Light / Dark Mode**.
 
 ---
 
@@ -268,7 +221,7 @@ Menampilkan informasi *path* integrasi repositori `human-imitation-learning`, st
 | Method | Endpoint | Deskripsi |
 | :--- | :--- | :--- |
 | `GET` | `/api/health` | Status kesehatan server backend & mode *storage* (`ephemeral_in_memory_no_database`). |
-| `GET` | `/api/dashboard/overview` | Ringkasan KPI dashboard, kurva progres 2.495 iterasi, performa 22 sendi, dan telemetri hardware. |
+| `GET` | `/api/dashboard/overview` | Data asli `k1_metrics.json`, ringkasan run TensorBoard, performa 22 sendi, & telemetri hardware. |
 | `GET` | `/api/training/options` | Daftar robot, environment MJLab, dataset `.npz`, `.csv`, `.bvh`, dan daftar *checkpoint*. |
 | `GET` | `/api/training/status` | Status proses training aktif (`idle`, `running`, `paused`, `completed`), PID, & utilisasi CPU/GPU. |
 | `POST` | `/api/training/start` | Memvalidasi parameter & menjalankan subprocess `scripts/train_ppo.py`. |
@@ -281,11 +234,20 @@ Menampilkan informasi *path* integrasi repositori `human-imitation-learning`, st
 | `GET` | `/api/simulation/trajectory` | Data trajektori 149 frame @ 50 FPS (`ref` vs `sim`), error per sendi/body, & pose kamera `Head_2`. |
 | `GET` | `/api/simulation/render-frame` | Merender frame kamera MuJoCo C++ offscreen (JPEG Base64) untuk 6 mode POV. |
 | `POST` | `/api/simulation/discard` | Langsung membuang *buffer* dan *cache* simulasi dari memori (ephemeral mode). |
-| `GET` | `/api/analytics/summary` | Metrik evaluasi lengkap & deret scalar TensorBoard. |
+| `GET` | `/api/analytics/summary` | Metrik evaluasi asli `k1_metrics.json` & deret scalar TensorBoard. |
 | `GET` | `/api/analytics/export` | Unduh hasil eksperimen dalam format `CSV` atau `JSON`. |
 | `GET` | `/api/analytics/report.png` | Render grafik laporan konvergensi 4-panel via `Matplotlib`. |
 | `POST` | `/api/videos/generate` | Menjalankan *background job* pembuatan video MP4 MuJoCo + FFmpeg. |
 | `GET` | `/api/videos/stream/<id>` | Streaming video MP4 untuk preview HTML5 `<video>`. |
 | `GET` | `/api/videos/download/<id>` | Mengunduh file video MP4. |
 
+---
 
+## 7. Panduan Upload ke GitHub & Konfigurasi `.gitignore`
+
+File `.gitignore` telah disiapkan di [`fp-ichiro/.gitignore`](../.gitignore), [`monitoring-control-imitation/.gitignore`](./.gitignore), [`monitoring-control-imitation/frontend/.gitignore`](./frontend/.gitignore), dan [`human-imitation-learning/.gitignore`](../human-imitation-learning/.gitignore) untuk memastikan **data sensitif, environment lokal, cache besar, dan file biner yang tidak boleh dibagikan ke publik otomatis diabaikan oleh Git**:
+
+- **File Kredensial & Environment Rahasia**: `.env`, `.env.*`, `*.pem`, `*.key`, `*secret*`, `*credential*`.
+- **Virtual Environment & Build Lokal**: `.venv/`, `.python/`, `node_modules/`, `.next/`, `out/`, `__pycache__/`, `.cache/`.
+- **Log Training, Checkpoint Model & Video Hasil Render**: `logs/`, `events.out.tfevents.*`, `*.pt`, `*.pth`, `*.onnx`, `*.npz`, `*.pkl`, `*.bvh`, `*.mp4`.
+- **State / File Sementara**: `instance/`, `*.db`, `*.sqlite*`, `*.log`.

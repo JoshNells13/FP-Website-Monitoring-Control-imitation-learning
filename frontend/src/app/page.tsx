@@ -160,27 +160,25 @@ export default function PlatformPage() {
     <div className="min-h-screen flex bg-[#F3F4F6] dark:bg-[#0b0f17] text-zinc-900 dark:text-zinc-100 p-3 sm:p-4 gap-5">
       {/* Left Minimalist Bento Sidebar */}
       <aside
-        className={`${
-          sidebarCollapsed ? "w-20" : "w-60"
-        } shrink-0 flex flex-col justify-between transition-all duration-200 select-none`}
+        className={`${sidebarCollapsed ? "w-20" : "w-60"
+          } shrink-0 flex flex-col justify-between transition-all duration-200 select-none`}
       >
         <div>
           <div className="px-3 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-lime-400 text-white dark:text-zinc-950 flex items-center justify-center font-black text-sm tracking-tighter">
-                K1
+                JJ
               </div>
               {!sidebarCollapsed && (
                 <span className="text-xl font-black tracking-tight text-zinc-900 dark:text-white">
-                  MJLAB
+                  JossJiss
                 </span>
               )}
             </div>
             {!sidebarCollapsed && (
               <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  socketConnected ? "bg-lime-500" : "bg-amber-400"
-                }`}
+                className={`h-2.5 w-2.5 rounded-full ${socketConnected ? "bg-lime-500" : "bg-amber-400"
+                  }`}
                 title={socketConnected ? "Socket.IO Live Connected" : "Polling"}
               />
             )}
@@ -203,11 +201,10 @@ export default function PlatformPage() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-medium transition ${
-                    isActive
+                  className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-medium transition ${isActive
                       ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
                       : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-800/40"
-                  }`}
+                    }`}
                 >
                   {isActive && (
                     <span className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-zinc-900 dark:bg-lime-400 rounded-r-full" />
@@ -236,9 +233,8 @@ export default function PlatformPage() {
                 </span>
                 {!sidebarCollapsed && (
                   <ChevronDown
-                    className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${
-                      telemetryGroupOpen ? "rotate-180" : ""
-                    }`}
+                    className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${telemetryGroupOpen ? "rotate-180" : ""
+                      }`}
                   />
                 )}
               </button>
@@ -265,11 +261,10 @@ export default function PlatformPage() {
                       <button
                         key={sub.id}
                         onClick={() => setActiveTab(sub.id)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition ${
-                          isSubActive
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition ${isSubActive
                             ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
                             : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                        }`}
+                          }`}
                       >
                         <span>{sub.label}</span>
                         {sub.count && (
@@ -300,11 +295,10 @@ export default function PlatformPage() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-medium transition ${
-                    isActive
+                  className={`relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-medium transition ${isActive
                       ? "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold"
                       : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-800/40"
-                  }`}
+                    }`}
                 >
                   {isActive && (
                     <span className="absolute left-0 top-2.5 bottom-2.5 w-1 bg-zinc-900 dark:bg-lime-400 rounded-r-full" />
@@ -379,9 +373,8 @@ export default function PlatformPage() {
           <div className="flex flex-wrap items-center gap-2.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl px-4 py-2.5 text-xs shadow-[0_2px_10px_rgba(15,23,42,0.02)]">
             <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-900 dark:text-white">
               <Radio
-                className={`w-3.5 h-3.5 ${
-                  socketConnected ? "text-lime-500" : "text-amber-500"
-                }`}
+                className={`w-3.5 h-3.5 ${socketConnected ? "text-lime-500" : "text-amber-500"
+                  }`}
               />
               {socketConnected ? "SOCKET.IO LIVE" : "REST POLLING"}
             </span>
