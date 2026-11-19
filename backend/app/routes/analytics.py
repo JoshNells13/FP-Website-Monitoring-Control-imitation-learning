@@ -4,6 +4,7 @@ import json
 from flask import Blueprint, Response, abort, jsonify, request, send_from_directory
 
 from app.models.database import runtime_store
+from app.services.experiment_service import sync_filesystem_to_db
 from app.services.metrics_service import (
     build_iteration_series,
     export_metrics_dataframe,
@@ -20,11 +21,12 @@ analytics_bp = Blueprint("analytics", __name__, url_prefix="/api/analytics")
 
 @analytics_bp.route("/summary", methods=["GET"])
 def get_analytics_summary():
+    sync_filesystem_to_db()
     exp_id = request.args.get("experiment_id")
     eval_metrics = get_primary_evaluation_metrics()
 
-    all_exps = sorted(runtime_store.experiments.values(), key=lambda x: x.final_step)
-    all_ckpts = sorted(runtime_store.checkpoints.values(), key=lambda x: x.iteration)
+    all_exps = sorted(runtime_store.experiments.values(), key=lambda x: (x.created_at, x.run_id))
+    all_ckpts = sorted(runtime_store.checkpoints.values(), key=lambda x: (x.is_primary_output, x.created_at, x.iteration), reverse=True)
 
     if exp_id:
         exp = runtime_store.experiments.get(int(exp_id))
@@ -36,10 +38,16 @@ def get_analytics_summary():
         selected_exp_dict = exp.to_dict(include_details=True)
     else:
         exp = all_exps[-1] if all_exps else None
-        series = get_combined_training_progression(max_points=300)
+        if exp and exp.log_dir and (HIL_ROOT / exp.log_dir).exists():
+            tb = extract_tensorboard_run((HIL_ROOT / exp.log_dir).resolve())
+            series = build_iteration_series(tb["scalars"], max_points=300)
+        else:
+            series = get_combined_training_progression(max_points=300)
         selected_exp_dict = exp.to_dict(include_details=True) if exp else None
 
-    traj_bundle = get_motion_trajectory_bundle()
+    target_motion = exp.motion_file if (exp and exp.motion_file) else "data/motions/k1_kick.npz"
+    target_ckpt = exp.best_checkpoint_path if (exp and exp.best_checkpoint_path) else "outputs/checkpoints/k1_kick_policy.pt"
+    traj_bundle = get_motion_trajectory_bundle(motion_file=target_motion, checkpoint_file=target_ckpt)
 
     return jsonify({
         "selected_experiment": selected_exp_dict,

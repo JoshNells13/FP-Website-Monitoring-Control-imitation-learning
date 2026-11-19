@@ -3,13 +3,16 @@ from __future__ import annotations
 from flask import Blueprint, jsonify
 
 from app.models.database import runtime_store
-from app.services.experiment_service import sync_filesystem_to_db
+from app.services.experiment_service import compute_hil_filesystem_signature, sync_filesystem_to_db
 from app.services.metrics_service import (
+    build_iteration_series,
+    extract_tensorboard_run,
     get_combined_training_progression,
     get_primary_evaluation_metrics,
 )
 from app.services.training_service import training_manager
 from app.utils.system_monitor import get_system_resources
+from config import HIL_ROOT
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/api/dashboard")
 
@@ -20,7 +23,7 @@ def get_overview():
 
     all_exps = sorted(
         [e for e in runtime_store.experiments.values() if not e.is_archived],
-        key=lambda x: x.final_step,
+        key=lambda x: (x.created_at, x.run_id),
     )
     total_exps = len(all_exps)
     running_exps = sum(1 for e in all_exps if e.status == "running")
@@ -33,11 +36,16 @@ def get_overview():
 
     latest_exp = all_exps[-1] if all_exps else None
 
-    all_ckpts = list(runtime_store.checkpoints.values())
+    all_ckpts = sorted(
+        runtime_store.checkpoints.values(),
+        key=lambda c: (c.is_primary_output, c.created_at, c.iteration),
+        reverse=True,
+    )
     best_ckpt = (
-        next((c for c in all_ckpts if c.is_primary_output), None)
+        next((c for c in all_ckpts if c.is_primary_output and c.is_best), None)
+        or next((c for c in all_ckpts if c.is_primary_output), None)
         or next((c for c in all_ckpts if c.is_best), None)
-        or (sorted(all_ckpts, key=lambda c: c.iteration, reverse=True)[0] if all_ckpts else None)
+        or (all_ckpts[0] if all_ckpts else None)
     )
 
     eval_metrics = get_primary_evaluation_metrics()
@@ -50,7 +58,14 @@ def get_overview():
         for a in reversed(runtime_store.activities[-12:])
     ]
 
-    progression = get_combined_training_progression(max_points=180)
+    progression = []
+    if latest_exp and latest_exp.log_dir:
+        latest_rdir = (HIL_ROOT / latest_exp.log_dir).resolve()
+        if latest_rdir.exists():
+            tb_latest = extract_tensorboard_run(latest_rdir)
+            progression = build_iteration_series(tb_latest["scalars"], max_points=180)
+    if not progression:
+        progression = get_combined_training_progression(max_points=180)
     peak_reward = max((float(r["mean_reward"]) for r in progression if "mean_reward" in r), default=None)
 
     per_joint_list = []
@@ -65,6 +80,7 @@ def get_overview():
 
     return jsonify({
         "storage_mode": "ephemeral_in_memory_no_database",
+        "filesystem_signature": compute_hil_filesystem_signature(),
         "summary": {
             "total_experiments": total_exps,
             "running_experiments": running_exps,

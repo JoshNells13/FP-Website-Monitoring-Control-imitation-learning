@@ -167,7 +167,17 @@ def get_motion_trajectory_bundle(
     """Return full 149-frame reference and policy rollout trajectories, per-joint errors, and camera poses."""
     motion_path = safe_resolve_in_hil(motion_file)
     ckpt_path = safe_resolve_in_hil(checkpoint_file) if checkpoint_file else (HIL_ROOT / "outputs/checkpoints/k1_kick_policy.pt")
-    cache_key = (str(motion_path), str(ckpt_path))
+
+    specific_rollout_path = EVALUATION_DIR / f"{motion_path.stem}_rollout_trajectory.npz"
+    fallback_rollout_path = EVALUATION_DIR / "k1_rollout_trajectory.npz"
+    rollout_npz_path = specific_rollout_path if specific_rollout_path.exists() else fallback_rollout_path
+
+    m_mtime = motion_path.stat().st_mtime if motion_path.exists() else 0.0
+    c_mtime = ckpt_path.stat().st_mtime if ckpt_path.exists() else 0.0
+    r_mtime = rollout_npz_path.stat().st_mtime if rollout_npz_path.exists() else 0.0
+    motions_list_sig = ",".join(sorted(f.name for f in MOTIONS_DIR.glob("*.npz"))) if MOTIONS_DIR.exists() else ""
+
+    cache_key = (str(motion_path), str(ckpt_path), m_mtime, c_mtime, r_mtime, motions_list_sig)
     if cache_key in _TRAJECTORY_CACHE:
         return _TRAJECTORY_CACHE[cache_key]
 
@@ -180,10 +190,6 @@ def get_motion_trajectory_bundle(
     ref_bpos = ref_npz["body_pos_w"].astype(np.float32)   # (T, 23, 3)
     ref_bquat = ref_npz["body_quat_w"].astype(np.float32) # (T, 23, 4) wxyz
     T = ref_q.shape[0]
-
-    specific_rollout_path = EVALUATION_DIR / f"{motion_path.stem}_rollout_trajectory.npz"
-    fallback_rollout_path = EVALUATION_DIR / "k1_rollout_trajectory.npz"
-    rollout_npz_path = specific_rollout_path if specific_rollout_path.exists() else fallback_rollout_path
 
     r_npz = np.load(rollout_npz_path) if rollout_npz_path.exists() else None
     has_matching_rollout = r_npz is not None and r_npz["sim_joint_pos"].shape[0] == T

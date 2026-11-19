@@ -17,7 +17,7 @@ def list_checkpoints():
     ckpts = list(runtime_store.checkpoints.values())
     if exp_id:
         ckpts = [c for c in ckpts if c.experiment_id == int(exp_id)]
-    ckpts.sort(key=lambda c: (c.is_primary_output, c.iteration), reverse=True)
+    ckpts.sort(key=lambda c: (c.is_primary_output, c.created_at, c.iteration), reverse=True)
     return jsonify({
         "checkpoints": [c.to_dict() for c in ckpts],
         "total": len(ckpts),

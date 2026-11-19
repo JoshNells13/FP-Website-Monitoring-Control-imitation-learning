@@ -19,7 +19,7 @@ def list_experiments():
     exps = list(runtime_store.experiments.values())
     if not include_archived:
         exps = [e for e in exps if not e.is_archived]
-    exps.sort(key=lambda e: (e.final_step, e.created_at), reverse=True)
+    exps.sort(key=lambda e: (e.created_at, e.run_id), reverse=True)
     return jsonify({
         "storage_mode": "ephemeral_in_memory_no_database",
         "experiments": [e.to_dict(include_details=True) for e in exps],
