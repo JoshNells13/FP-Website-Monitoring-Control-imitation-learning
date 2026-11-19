@@ -5,7 +5,7 @@ Platform berbasis web (**Next.js 14 Bento UI + Flask + Socket.IO + Three.js + Mu
 ---
 
 ## Daftar Isi
-1. [Arsitektur & Prinsip 100% Data Asli (Zero Dummy Data & Zero Database)](#1-arsitektur--prinsip-100-data-asli-zero-dummy-data--zero-database)
+1. [Arsitektur & Prinsip 100% Data Asli](#1-arsitektur)
 2. [Bagaimana Backend & Frontend Terhubung ke Folder Simulasi (`human-imitation-learning`)](#2-bagaimana-backend--frontend-terhubung-ke-folder-simulasi-human-imitation-learning)
 3. [Dokumentasi & Cara Menjalankan Backend (Flask + Socket.IO)](#3-dokumentasi--cara-menjalankan-backend-flask--socketio)
 4. [Dokumentasi & Cara Menjalankan Frontend (Next.js Bento UI)](#4-dokumentasi--cara-menjalankan-frontend-nextjs-bento-ui)
@@ -15,7 +15,7 @@ Platform berbasis web (**Next.js 14 Bento UI + Flask + Socket.IO + Three.js + Mu
 
 ---
 
-## 1. Arsitektur & Prinsip 100% Data Asli (Zero Dummy Data & Zero Database)
+## 1. Arsitektur
 
 Platform ini dirancang dengan dua prinsip utama:
 1. **100% Data Asli dari Pipeline Simulasi (Tanpa Data Dummy / Tanpa Angka Fallback Statis)**:
