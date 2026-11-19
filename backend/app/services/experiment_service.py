@@ -214,44 +214,46 @@ def sync_filesystem_to_db() -> None:
 
             exp.checkpoints = exp_ckpts
 
-        # Primary evaluated output checkpoint: outputs/checkpoints/k1_kick_policy.pt
-        primary_pt = CHECKPOINTS_DIR / "k1_kick_policy.pt"
-        primary_onnx = CHECKPOINTS_DIR / "k1_kick_policy.onnx"
-        if primary_pt.exists():
-            rel_pt = str(primary_pt.relative_to(HIL_ROOT)).replace("\\", "/")
-            rel_onnx = str(primary_onnx.relative_to(HIL_ROOT)).replace("\\", "/") if primary_onnx.exists() else None
-            p_ckpt = ckpt_by_path.get(rel_pt)
-            if not p_ckpt:
-                p_ckpt = Checkpoint(
-                    id=runtime_store.next_ckpt_id(),
-                    experiment_id=None,
-                    experiment_run_id="evaluated_policy",
-                    experiment_name="outputs/checkpoints/k1_kick_policy.pt",
-                    name="k1_kick_policy.pt (Evaluated Policy)",
-                    filename=primary_pt.name,
-                    file_path=rel_pt,
-                    onnx_path=rel_onnx,
-                    iteration=2495,
-                    file_size_bytes=primary_pt.stat().st_size,
-                    is_best=True,
-                    is_primary_output=True,
-                    notes="Evaluated via scripts/evaluate_and_play.py (outputs/evaluation/k1_metrics.json).",
-                    created_at=datetime.fromtimestamp(primary_pt.stat().st_mtime, tz=timezone.utc),
-                )
-                runtime_store.checkpoints[p_ckpt.id] = p_ckpt
-            if eval_metrics:
-                latest_exp_rew = (
-                    sorted(runtime_store.experiments.values(), key=lambda x: x.final_step)[-1].mean_reward
-                    if runtime_store.experiments
-                    else None
-                )
-                p_ckpt.mean_reward = latest_exp_rew
-                p_ckpt.tracking_error_mae = float(eval_metrics["joint_tracking_mae_rad"])
-                p_ckpt.tracking_error_rmse = float(eval_metrics["joint_tracking_rmse_rad"])
-                p_ckpt.r_mpkpe_mm = float(eval_metrics["r_mpkpe_mm"])
-                p_ckpt.mpkpe_mm = float(eval_metrics["mpkpe_mm"])
-                p_ckpt.success_rate = float(eval_metrics["success_rate_percent"])
-                p_ckpt.metrics_json = json.dumps(eval_metrics)
+        # Discover all primary output checkpoints in outputs/checkpoints/*.pt
+        if CHECKPOINTS_DIR.exists():
+            eval_ckpt_rel = str(eval_metrics.get("checkpoint_file", "")).replace("\\", "/")
+            for pt_file in sorted(CHECKPOINTS_DIR.glob("*.pt"), key=lambda p: p.stat().st_mtime, reverse=True):
+                rel_pt = str(pt_file.relative_to(HIL_ROOT)).replace("\\", "/")
+                onnx_file = pt_file.with_suffix(".onnx")
+                rel_onnx = str(onnx_file.relative_to(HIL_ROOT)).replace("\\", "/") if onnx_file.exists() else None
+                p_ckpt = ckpt_by_path.get(rel_pt)
+                is_eval_match = (rel_pt == eval_ckpt_rel) or (not eval_ckpt_rel and pt_file.name == "k1_kick_policy.pt")
+                if not p_ckpt:
+                    p_ckpt = Checkpoint(
+                        id=runtime_store.next_ckpt_id(),
+                        experiment_id=None,
+                        experiment_run_id="evaluated_policy",
+                        experiment_name=rel_pt,
+                        name=f"{pt_file.name} (Output Policy)",
+                        filename=pt_file.name,
+                        file_path=rel_pt,
+                        onnx_path=rel_onnx,
+                        iteration=2495 if "kick" in pt_file.name else 500,
+                        file_size_bytes=pt_file.stat().st_size,
+                        is_best=is_eval_match,
+                        is_primary_output=True,
+                        notes="Output policy checkpoint in outputs/checkpoints/.",
+                        created_at=datetime.fromtimestamp(pt_file.stat().st_mtime, tz=timezone.utc),
+                    )
+                    runtime_store.checkpoints[p_ckpt.id] = p_ckpt
+                if is_eval_match and eval_metrics:
+                    latest_exp_rew = (
+                        sorted(runtime_store.experiments.values(), key=lambda x: x.created_at)[-1].mean_reward
+                        if runtime_store.experiments
+                        else None
+                    )
+                    p_ckpt.mean_reward = latest_exp_rew
+                    p_ckpt.tracking_error_mae = float(eval_metrics["joint_tracking_mae_rad"])
+                    p_ckpt.tracking_error_rmse = float(eval_metrics["joint_tracking_rmse_rad"])
+                    p_ckpt.r_mpkpe_mm = float(eval_metrics["r_mpkpe_mm"])
+                    p_ckpt.mpkpe_mm = float(eval_metrics["mpkpe_mm"])
+                    p_ckpt.success_rate = float(eval_metrics["success_rate_percent"])
+                    p_ckpt.metrics_json = json.dumps(eval_metrics)
 
         # Discover actual MP4 files present in outputs/videos/
         if VIDEOS_DIR.exists():

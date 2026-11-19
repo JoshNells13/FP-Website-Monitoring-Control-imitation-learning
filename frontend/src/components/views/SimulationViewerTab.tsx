@@ -16,6 +16,8 @@ import {
 interface SimulationViewerTabProps {
   trajectory: TrajectoryBundle | null;
   checkpoints: any[];
+  selectedMotion?: string;
+  onSelectMotion?: (motionPath: string) => void;
   selectedCheckpoint: string;
   onSelectCheckpoint: (path: string) => void;
   initialCameraPov?: CameraPOV;
@@ -33,6 +35,8 @@ const CAMERA_POVS: { id: CameraPOV; label: string; desc: string }[] = [
 export default function SimulationViewerTab({
   trajectory,
   checkpoints,
+  selectedMotion = "data/motions/k1_dance.npz",
+  onSelectMotion,
   selectedCheckpoint,
   onSelectCheckpoint,
   initialCameraPov = "third_person",
@@ -79,7 +83,9 @@ export default function SimulationViewerTab({
           ? "side_by_side"
           : "policy";
       const res = await apiFetch(
-        `/api/simulation/render-frame?frame=${fIdx}&camera_pov=${pov}&mode=${modeParam}&checkpoint_file=${encodeURIComponent(
+        `/api/simulation/render-frame?frame=${fIdx}&camera_pov=${pov}&mode=${modeParam}&motion_file=${encodeURIComponent(
+          selectedMotion
+        )}&checkpoint_file=${encodeURIComponent(
           selectedCheckpoint
         )}&width=560&height=360`
       );
@@ -268,8 +274,26 @@ export default function SimulationViewerTab({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <span className="text-zinc-500">Policy:</span>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                <span className="text-zinc-500">Motion:</span>
+                <select
+                  value={selectedMotion}
+                  onChange={(e) => onSelectMotion?.(e.target.value)}
+                  className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-2.5 py-1.5 text-zinc-800 dark:text-zinc-200"
+                >
+                  {((trajectory as any)?.available_motions?.length
+                    ? (trajectory as any).available_motions
+                    : [
+                        { name: "k1_dance.npz", path: "data/motions/k1_dance.npz" },
+                        { name: "k1_kick.npz", path: "data/motions/k1_kick.npz" },
+                      ]
+                  ).map((m: { name: string; path: string }) => (
+                    <option key={m.path} value={m.path}>
+                      {m.name} (50Hz)
+                    </option>
+                  ))}
+                </select>
+                <span className="text-zinc-500 ml-1">Policy:</span>
                 <select
                   value={selectedCheckpoint}
                   onChange={(e) => onSelectCheckpoint(e.target.value)}

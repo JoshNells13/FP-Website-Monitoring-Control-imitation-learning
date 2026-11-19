@@ -428,7 +428,7 @@ class TrainingProcessManager:
         bvh_files = []
         bvh_dir = DATA_DIR / "bvh"
         if bvh_dir.exists():
-            for f in sorted(bvh_dir.glob("*.bvh")):
+            for f in sorted(bvh_dir.rglob("*.bvh")):
                 bvh_files.append({
                     "name": f.name,
                     "path": str(f.relative_to(HIL_ROOT)).replace("\\", "/"),

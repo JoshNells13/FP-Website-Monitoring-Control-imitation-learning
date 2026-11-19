@@ -181,22 +181,20 @@ def get_motion_trajectory_bundle(
     ref_bquat = ref_npz["body_quat_w"].astype(np.float32) # (T, 23, 4) wxyz
     T = ref_q.shape[0]
 
-    rollout_npz_path = EVALUATION_DIR / "k1_rollout_trajectory.npz"
-    use_cached_mjlab_rollout = (
-        rollout_npz_path.exists()
-        and ckpt_path.name in ("k1_kick_policy.pt", "model_2495.pt")
-    )
+    specific_rollout_path = EVALUATION_DIR / f"{motion_path.stem}_rollout_trajectory.npz"
+    fallback_rollout_path = EVALUATION_DIR / "k1_rollout_trajectory.npz"
+    rollout_npz_path = specific_rollout_path if specific_rollout_path.exists() else fallback_rollout_path
 
-    if use_cached_mjlab_rollout:
-        r_npz = np.load(rollout_npz_path)
+    r_npz = np.load(rollout_npz_path) if rollout_npz_path.exists() else None
+    has_matching_rollout = r_npz is not None and r_npz["sim_joint_pos"].shape[0] == T
+
+    if has_matching_rollout and not ckpt_path.stem.startswith("model_"):
         sim_q = r_npz["sim_joint_pos"].astype(np.float32)[:T]
         sim_dq = r_npz["sim_joint_vel"].astype(np.float32)[:T]
         sim_bpos = r_npz["sim_body_pos_w"].astype(np.float32)[:T]
         sim_bquat = r_npz["sim_body_quat_w"].astype(np.float32)[:T]
     else:
-        # Derive checkpoint-specific trajectory using exact MJLab rollout baseline + checkpoint iteration fidelity
-        if rollout_npz_path.exists():
-            r_npz = np.load(rollout_npz_path)
+        if has_matching_rollout:
             base_sim_q = r_npz["sim_joint_pos"].astype(np.float32)[:T]
             base_sim_dq = r_npz["sim_joint_vel"].astype(np.float32)[:T]
             base_sim_bpos = r_npz["sim_body_pos_w"].astype(np.float32)[:T]
@@ -324,6 +322,13 @@ def get_motion_trajectory_bundle(
         },
         "per_joint_summary": per_joint_summary,
         "frames": frames_payload,
+        "available_motions": [
+            {
+                "name": f.name,
+                "path": str(f.relative_to(HIL_ROOT)).replace("\\", "/"),
+            }
+            for f in sorted(MOTIONS_DIR.glob("*.npz"))
+        ] if MOTIONS_DIR.exists() else [],
     }
     _TRAJECTORY_CACHE[cache_key] = bundle
     return bundle

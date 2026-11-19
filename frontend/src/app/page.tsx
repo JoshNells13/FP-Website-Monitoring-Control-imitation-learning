@@ -44,8 +44,11 @@ export default function PlatformPage() {
   const [trajectory, setTrajectory] = useState<TrajectoryBundle | null>(null);
   const [checkpoints, setCheckpoints] = useState<any[]>([]);
   const [videos, setVideos] = useState<any[]>([]);
+  const [selectedMotion, setSelectedMotion] = useState<string>(
+    "data/motions/k1_dance.npz"
+  );
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<string>(
-    "outputs/checkpoints/k1_kick_policy.pt"
+    "outputs/checkpoints/k1_dance_policy.pt"
   );
   const [initialCameraPov, setInitialCameraPov] = useState<CameraPOV>("third_person");
 
@@ -76,12 +79,12 @@ export default function PlatformPage() {
     }
   }, []);
 
-  const fetchTrajectory = useCallback(async (ckptPath: string) => {
+  const fetchTrajectory = useCallback(async (motionPath: string, ckptPath: string) => {
     try {
       const bundle = await apiFetch<TrajectoryBundle>(
-        `/api/simulation/trajectory?motion_file=data/motions/k1_kick.npz&checkpoint_file=${encodeURIComponent(
-          ckptPath
-        )}`
+        `/api/simulation/trajectory?motion_file=${encodeURIComponent(
+          motionPath
+        )}&checkpoint_file=${encodeURIComponent(ckptPath)}`
       );
       setTrajectory(bundle);
     } catch {
@@ -91,8 +94,8 @@ export default function PlatformPage() {
 
   useEffect(() => {
     fetchCoreData();
-    fetchTrajectory(selectedCheckpoint);
-  }, [fetchCoreData, fetchTrajectory, selectedCheckpoint]);
+    fetchTrajectory(selectedMotion, selectedCheckpoint);
+  }, [fetchCoreData, fetchTrajectory, selectedMotion, selectedCheckpoint]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -146,6 +149,11 @@ export default function PlatformPage() {
 
   const handleSelectCheckpointForSim = (ckptPath: string) => {
     setSelectedCheckpoint(ckptPath);
+    if (ckptPath.toLowerCase().includes("dance")) {
+      setSelectedMotion("data/motions/k1_dance.npz");
+    } else if (ckptPath.toLowerCase().includes("kick")) {
+      setSelectedMotion("data/motions/k1_kick.npz");
+    }
     setActiveTab("simulation");
   };
 
@@ -459,8 +467,17 @@ export default function PlatformPage() {
             <SimulationViewerTab
               trajectory={trajectory}
               checkpoints={checkpoints}
+              selectedMotion={selectedMotion}
+              onSelectMotion={(m) => setSelectedMotion(m)}
               selectedCheckpoint={selectedCheckpoint}
-              onSelectCheckpoint={(path) => setSelectedCheckpoint(path)}
+              onSelectCheckpoint={(path) => {
+                setSelectedCheckpoint(path);
+                if (path.toLowerCase().includes("dance")) {
+                  setSelectedMotion("data/motions/k1_dance.npz");
+                } else if (path.toLowerCase().includes("kick")) {
+                  setSelectedMotion("data/motions/k1_kick.npz");
+                }
+              }}
               initialCameraPov={initialCameraPov}
             />
           )}
