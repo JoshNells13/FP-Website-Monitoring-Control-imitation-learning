@@ -16,6 +16,7 @@ interface TrainingCenterTabProps {
   trainingState: any;
   logs: any[];
   resources: any;
+  fsSignature?: string;
   onRefresh: () => void;
 }
 
@@ -23,6 +24,7 @@ export default function TrainingCenterTab({
   trainingState,
   logs,
   resources,
+  fsSignature,
   onRefresh,
 }: TrainingCenterTabProps) {
   const [options, setOptions] = useState<any>(null);
@@ -48,7 +50,7 @@ export default function TrainingCenterTab({
     apiFetch("/api/training/options")
       .then((res) => setOptions(res))
       .catch(() => {});
-  }, []);
+  }, [fsSignature]);
 
   useEffect(() => {
     if (logContainerRef.current) {

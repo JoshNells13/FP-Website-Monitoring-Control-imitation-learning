@@ -11,15 +11,26 @@ import {
   Activity,
   Gauge,
   Monitor,
+  RefreshCw,
 } from "lucide-react";
+
+interface DetectedMotion {
+  name: string;
+  path: string;
+  size_kb?: number;
+  has_rollout?: boolean;
+  matched_policy?: string | null;
+}
 
 interface SimulationViewerTabProps {
   trajectory: TrajectoryBundle | null;
+  availableMotions?: DetectedMotion[];
   checkpoints: any[];
   selectedMotion?: string;
   onSelectMotion?: (motionPath: string) => void;
   selectedCheckpoint: string;
   onSelectCheckpoint: (path: string) => void;
+  onRefreshAssets?: () => void;
   initialCameraPov?: CameraPOV;
 }
 
@@ -34,11 +45,13 @@ const CAMERA_POVS: { id: CameraPOV; label: string; desc: string }[] = [
 
 export default function SimulationViewerTab({
   trajectory,
+  availableMotions = [],
   checkpoints,
-  selectedMotion = "data/motions/k1_dance.npz",
+  selectedMotion = "",
   onSelectMotion,
   selectedCheckpoint,
   onSelectCheckpoint,
+  onRefreshAssets,
   initialCameraPov = "third_person",
 }: SimulationViewerTabProps) {
   const [isPlaying, setIsPlaying] = useState(true);
@@ -59,10 +72,18 @@ export default function SimulationViewerTab({
     }
   }, [initialCameraPov]);
 
-  const totalFrames = trajectory?.frame_count || 149;
   const frames = trajectory?.frames || [];
-  const currentFrameData = frames[frameIndex] || null;
+  const totalFrames = trajectory?.frame_count || frames.length || 1;
+  const currentFrameData = frames[Math.min(frameIndex, Math.max(0, frames.length - 1))] || null;
   const jointSummaries = trajectory?.per_joint_summary || [];
+
+  const detectedMotions: DetectedMotion[] = availableMotions.length
+    ? availableMotions
+    : ((trajectory as any)?.available_motions || []);
+
+  useEffect(() => {
+    setFrameIndex(0);
+  }, [trajectory?.motion_file, frames.length]);
 
   useEffect(() => {
     if (!isPlaying || frames.length === 0) return;
@@ -275,36 +296,49 @@ export default function SimulationViewerTab({
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-                <span className="text-zinc-500">Motion:</span>
+                <span className="text-zinc-500">Motion ({detectedMotions.length}):</span>
                 <select
                   value={selectedMotion}
                   onChange={(e) => onSelectMotion?.(e.target.value)}
                   className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-2.5 py-1.5 text-zinc-800 dark:text-zinc-200"
                 >
-                  {((trajectory as any)?.available_motions?.length
-                    ? (trajectory as any).available_motions
-                    : [
-                        { name: "k1_dance.npz", path: "data/motions/k1_dance.npz" },
-                        { name: "k1_kick.npz", path: "data/motions/k1_kick.npz" },
-                      ]
-                  ).map((m: { name: string; path: string }) => (
-                    <option key={m.path} value={m.path}>
-                      {m.name} (50Hz)
-                    </option>
-                  ))}
+                  {detectedMotions.length === 0 ? (
+                    <option value="">Scanning data/motions/*.npz...</option>
+                  ) : (
+                    detectedMotions.map((m) => (
+                      <option key={m.path} value={m.path}>
+                        {m.name} {m.has_rollout ? "• Rollout Ready" : "• 50Hz Ref"}
+                      </option>
+                    ))
+                  )}
                 </select>
-                <span className="text-zinc-500 ml-1">Policy:</span>
+                <span className="text-zinc-500 ml-1">Policy ({checkpoints.length}):</span>
                 <select
                   value={selectedCheckpoint}
                   onChange={(e) => onSelectCheckpoint(e.target.value)}
                   className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-2.5 py-1.5 text-zinc-800 dark:text-zinc-200 max-w-xs"
                 >
-                  {checkpoints.map((c: any) => (
-                    <option key={c.file_path} value={c.file_path}>
-                      {c.filename} (Iter {c.iteration})
-                    </option>
-                  ))}
+                  {checkpoints.length === 0 ? (
+                    <option value="">No .pt policy detected</option>
+                  ) : (
+                    checkpoints.map((c: any) => (
+                      <option key={c.file_path} value={c.file_path}>
+                        {c.is_primary_output
+                          ? `[Output] ${c.filename} (Iter ${c.iteration})`
+                          : `${c.experiment_run_id || c.name} / ${c.filename}`}
+                      </option>
+                    ))
+                  )}
                 </select>
+                {onRefreshAssets && (
+                  <button
+                    onClick={onRefreshAssets}
+                    title="Scan ulang Motion (.npz) & Policy (.pt) dari folder human-imitation-learning"
+                    className="p-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 transition"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 

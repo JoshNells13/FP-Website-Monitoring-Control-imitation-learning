@@ -16,7 +16,7 @@ from app.services.metrics_service import (
     K1_23_BODY_NAMES,
 )
 from app.utils.system_monitor import safe_resolve_in_hil
-from config import EVALUATION_DIR, HIL_ROOT, K1_MESHES_DIR, K1_XML_PATH
+from config import EVALUATION_DIR, HIL_ROOT, K1_MESHES_DIR, K1_XML_PATH, MOTIONS_DIR
 from extensions import socketio
 
 # Mapping from each of the 23 articulated bodies to its visual STL mesh and material

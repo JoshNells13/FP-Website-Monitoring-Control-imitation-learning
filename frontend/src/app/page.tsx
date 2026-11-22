@@ -42,14 +42,11 @@ export default function PlatformPage() {
   const [trainingLogs, setTrainingLogs] = useState<any[]>([]);
   const [resources, setResources] = useState<any>(null);
   const [trajectory, setTrajectory] = useState<TrajectoryBundle | null>(null);
+  const [availableMotions, setAvailableMotions] = useState<any[]>([]);
   const [checkpoints, setCheckpoints] = useState<any[]>([]);
   const [videos, setVideos] = useState<any[]>([]);
-  const [selectedMotion, setSelectedMotion] = useState<string>(
-    "data/motions/k1_dance.npz"
-  );
-  const [selectedCheckpoint, setSelectedCheckpoint] = useState<string>(
-    "outputs/checkpoints/k1_dance_policy.pt"
-  );
+  const [selectedMotion, setSelectedMotion] = useState<string>("");
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState<string>("");
   const [initialCameraPov, setInitialCameraPov] = useState<CameraPOV>("third_person");
 
   const toggleTheme = () => {
@@ -62,8 +59,9 @@ export default function PlatformPage() {
 
   const fetchCoreData = useCallback(async () => {
     try {
-      const [ov, ckptsRes, vidsRes, logsRes] = await Promise.all([
+      const [ov, simAssetsRes, ckptsRes, vidsRes, logsRes] = await Promise.all([
         apiFetch("/api/dashboard/overview"),
+        apiFetch("/api/simulation/assets"),
         apiFetch("/api/checkpoints"),
         apiFetch("/api/videos"),
         apiFetch("/api/training/logs?limit=250"),
@@ -71,20 +69,48 @@ export default function PlatformPage() {
       setDashboardData(ov);
       setTrainingState(ov.training_state);
       setResources(ov.system_resources);
-      setCheckpoints(ckptsRes.checkpoints || []);
+
+      const detectedMotions: any[] = simAssetsRes?.motions || [];
+      const detectedPolicies: any[] =
+        simAssetsRes?.policies?.length ? simAssetsRes.policies : ckptsRes.checkpoints || [];
+
+      setAvailableMotions(detectedMotions);
+      setCheckpoints(detectedPolicies);
       setVideos(vidsRes.videos || []);
       setTrainingLogs(logsRes.logs || []);
+
+      // Keep selectedMotion and selectedCheckpoint valid against real files on disk
+      setSelectedMotion((prev) => {
+        if (prev && detectedMotions.some((m) => m.path === prev)) {
+          return prev;
+        }
+        return simAssetsRes?.default_motion || detectedMotions[0]?.path || "";
+      });
+
+      setSelectedCheckpoint((prev) => {
+        if (prev && detectedPolicies.some((c) => c.file_path === prev)) {
+          return prev;
+        }
+        const defaultMotionObj = detectedMotions[0];
+        return (
+          defaultMotionObj?.matched_policy ||
+          simAssetsRes?.default_policy ||
+          detectedPolicies[0]?.file_path ||
+          ""
+        );
+      });
     } catch {
       // ignore
     }
   }, []);
 
   const fetchTrajectory = useCallback(async (motionPath: string, ckptPath: string) => {
+    if (!motionPath) return;
     try {
       const bundle = await apiFetch<TrajectoryBundle>(
         `/api/simulation/trajectory?motion_file=${encodeURIComponent(
           motionPath
-        )}&checkpoint_file=${encodeURIComponent(ckptPath)}`
+        )}&checkpoint_file=${encodeURIComponent(ckptPath || "")}`
       );
       setTrajectory(bundle);
     } catch {
@@ -94,8 +120,13 @@ export default function PlatformPage() {
 
   useEffect(() => {
     fetchCoreData();
-    fetchTrajectory(selectedMotion, selectedCheckpoint);
-  }, [fetchCoreData, fetchTrajectory, selectedMotion, selectedCheckpoint]);
+  }, [fetchCoreData]);
+
+  useEffect(() => {
+    if (selectedMotion) {
+      fetchTrajectory(selectedMotion, selectedCheckpoint);
+    }
+  }, [fetchTrajectory, selectedMotion, selectedCheckpoint]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -122,6 +153,12 @@ export default function PlatformPage() {
         return [vrec, ...prev];
       });
     };
+    const onHilFilesystemChanged = () => {
+      fetchCoreData();
+      if (selectedMotion) {
+        fetchTrajectory(selectedMotion, selectedCheckpoint);
+      }
+    };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
@@ -129,12 +166,13 @@ export default function PlatformPage() {
     socket.on("training_progress", onTrainingProgress);
     socket.on("training_log", onTrainingLog);
     socket.on("video_progress", onVideoProgress);
+    socket.on("hil_filesystem_changed", onHilFilesystemChanged);
 
     if (socket.connected) setSocketConnected(true);
 
     const pollInterval = setInterval(() => {
       socket.emit("request_status");
-    }, 4000);
+    }, 3000);
 
     return () => {
       clearInterval(pollInterval);
@@ -144,16 +182,51 @@ export default function PlatformPage() {
       socket.off("training_progress", onTrainingProgress);
       socket.off("training_log", onTrainingLog);
       socket.off("video_progress", onVideoProgress);
+      socket.off("hil_filesystem_changed", onHilFilesystemChanged);
     };
-  }, []);
+  }, [fetchCoreData, fetchTrajectory, selectedMotion, selectedCheckpoint]);
+
+  const matchMotionForCheckpoint = useCallback(
+    (ckptPath: string) => {
+      const ckptObj = checkpoints.find((c) => c.file_path === ckptPath);
+      if (ckptObj?.matched_motion) return ckptObj.matched_motion;
+      const lower = ckptPath.toLowerCase();
+      const avail: { name: string; path: string }[] = availableMotions.length
+        ? availableMotions
+        : (trajectory as any)?.available_motions || [];
+      for (const m of avail) {
+        const tag = m.name.replace(".npz", "").replace(/^k1_/, "").toLowerCase();
+        if (tag && lower.includes(tag)) {
+          return m.path;
+        }
+      }
+      return null;
+    },
+    [availableMotions, checkpoints, trajectory]
+  );
+
+  const matchCheckpointForMotion = useCallback(
+    (motionPath: string) => {
+      const motionObj = availableMotions.find((m) => m.path === motionPath);
+      if (motionObj?.matched_policy) return motionObj.matched_policy;
+      const stem = motionPath.split("/").pop()?.replace(".npz", "").toLowerCase() || "";
+      const tag = stem.replace(/^k1_/, "");
+      const exact = checkpoints.find(
+        (c) => c.file_path?.toLowerCase().endsWith(`${stem}_policy.pt`)
+      );
+      if (exact) return exact.file_path;
+      const byTag = checkpoints.find(
+        (c) => c.is_primary_output && tag && c.file_path?.toLowerCase().includes(tag)
+      );
+      return byTag ? byTag.file_path : null;
+    },
+    [availableMotions, checkpoints]
+  );
 
   const handleSelectCheckpointForSim = (ckptPath: string) => {
     setSelectedCheckpoint(ckptPath);
-    if (ckptPath.toLowerCase().includes("dance")) {
-      setSelectedMotion("data/motions/k1_dance.npz");
-    } else if (ckptPath.toLowerCase().includes("kick")) {
-      setSelectedMotion("data/motions/k1_kick.npz");
-    }
+    const matched = matchMotionForCheckpoint(ckptPath);
+    if (matched) setSelectedMotion(matched);
     setActiveTab("simulation");
   };
 
@@ -460,24 +533,28 @@ export default function PlatformPage() {
               trainingState={trainingState}
               logs={trainingLogs}
               resources={resources}
+              fsSignature={dashboardData?.filesystem_signature}
               onRefresh={fetchCoreData}
             />
           )}
           {activeTab === "simulation" && (
             <SimulationViewerTab
               trajectory={trajectory}
+              availableMotions={availableMotions}
               checkpoints={checkpoints}
               selectedMotion={selectedMotion}
-              onSelectMotion={(m) => setSelectedMotion(m)}
+              onSelectMotion={(m) => {
+                setSelectedMotion(m);
+                const matchedCkpt = matchCheckpointForMotion(m);
+                if (matchedCkpt) setSelectedCheckpoint(matchedCkpt);
+              }}
               selectedCheckpoint={selectedCheckpoint}
               onSelectCheckpoint={(path) => {
                 setSelectedCheckpoint(path);
-                if (path.toLowerCase().includes("dance")) {
-                  setSelectedMotion("data/motions/k1_dance.npz");
-                } else if (path.toLowerCase().includes("kick")) {
-                  setSelectedMotion("data/motions/k1_kick.npz");
-                }
+                const matchedMotion = matchMotionForCheckpoint(path);
+                if (matchedMotion) setSelectedMotion(matchedMotion);
               }}
+              onRefreshAssets={fetchCoreData}
               initialCameraPov={initialCameraPov}
             />
           )}
